@@ -1,0 +1,35 @@
+COMMAND LIST
+-----------------------------------------------
+R  => sw micro reset
+
+hx => hall rephase [bool, default=0]
+      x=0 => hall rephase disabled
+      x=1 => hall rephase enabled
+
+px => power setpoint % (DAC waveform amplitude) [float, deafult=0.0]
+      x=[0..100]%
+
+rx => velocity setpoint in rpm [float, default=0.0]
+
+lx => phase pilot waveform generation [int, default=0]
+      x=0 => sin()
+      x=1 => SINE_LOOKUP_TABLE
+      x=2 => SINE3D_LOOKUP_TABLE
+      x=3 => SADDLE_LOOKUP_TABLE
+      x=4 => SADDLE1_LOOKUP_TABLE
+
+tx => plot time update (ms) [int, default=100]
+      
+dx => plot data to plot [int, default=-1]
+      x=-1 =>    --   |   --   | --
+      x= 0 =>    --   | loop_z | trd1_hz
+      x= 1 =>    --   |   --   | I_U
+      x= 2 =>    --   |   --   | I_V
+      x= 3 =>    --   |   --   | I_W
+      x= 4 =>    --   |   --   | I_B
+      x= 5 =>    --   |   --   | V_BATT
+      x= 6 =>    I_U  |   I_V  | I_U
+      x= 7 =>    --   |   --   | I_U
+
+
+

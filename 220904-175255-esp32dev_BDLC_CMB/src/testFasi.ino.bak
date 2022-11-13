@@ -1,0 +1,100 @@
+#include <Arduino.h>
+// BLDCDriver3PWM driver = BLDCDriver3PWM(27, 14, 12);
+// LowsideCurrentSense current_sense = LowsideCurrentSense((float)0.1, (float)30.0, 32, 33, 25);
+
+#define PWM_U 27
+#define PWM_V 14
+#define PWM_W 12
+
+#define I_U 32
+#define I_V 33
+#define I_W 25
+
+TaskHandle_t TaskReadHandle;
+TaskHandle_t TaskWriteHandle;
+
+void setup()
+{
+    pinMode(21, OUTPUT);
+    digitalWrite(21, HIGH);
+
+    Serial.begin(115200);
+
+    pinMode(27, OUTPUT);
+    pinMode(14, OUTPUT);
+    pinMode(12, OUTPUT);
+
+    pinMode(32, INPUT);
+    pinMode(33, INPUT);
+    pinMode(25, INPUT);
+
+    analogReadResolution(12);
+    analogSetAttenuation(ADC_0db);
+
+    xTaskCreatePinnedToCore(
+        TaskRead,
+        "TaskLoop",
+        5000,
+        NULL,
+        5,
+        &TaskReadHandle,
+        0);
+
+    xTaskCreatePinnedToCore(
+        TaskWrite,
+        "TaskSpeed",
+        5000,
+        NULL,
+        5,
+        &TaskWriteHandle,
+        1);
+}
+
+void TaskWrite(void *pvParameters)
+{
+    while (1)
+    {
+        Serial.println("ON");
+        digitalWrite(PWM_U, HIGH);
+
+        digitalWrite(PWM_V, HIGH);
+        digitalWrite(PWM_W, HIGH);
+
+        delay(5000);
+        Serial.println("OFF");
+        digitalWrite(PWM_U, LOW);
+        digitalWrite(PWM_V, LOW);
+        digitalWrite(PWM_W, LOW);
+        delay(5000);
+    }
+}
+
+void TaskRead(void *pvParameters)
+{
+    //int curA, curB, curC = 0;
+    while (1)
+    {
+        /*curA = 0;
+        curB = 0;
+        curC = 0;
+        for (int i = 0; i < 100; i++)
+        {
+            curA += analogRead(I_U);
+            curB += analogRead(I_V);
+            curC += analogRead(I_W);
+            delay(1);
+        }
+
+        curA /= 100;
+        curB /= 100;
+        curC /= 100;*/
+
+        Serial.printf("U:%d - V:%d - W:%d\n", analogRead(I_U), analogRead(I_V), analogRead(I_W));
+        delay(100);
+    }
+}
+
+void loop()
+{
+    vTaskDelete(NULL);
+}
