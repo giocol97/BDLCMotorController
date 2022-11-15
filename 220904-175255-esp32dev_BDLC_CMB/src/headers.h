@@ -1,5 +1,8 @@
 //Constants
 
+#include <Arduino.h>
+
+
 #define ENABLE_PIN 21
 #define LOG_RX 15
 #define LOG_TX 4
@@ -12,8 +15,8 @@
 
 //Motor constants
 #define POLE_PAIRS 8
-#define PHASE_RESISTANCE 1.42/2 //0.33
-#define KV_RATING 3660 //[rad/s/volt]  = 383 [rpm/volt]
+#define PHASE_RESISTANCE 1.42 //0.33
+#define KV_RATING 383 //3660 //[rad/s/volt]  = 383 [rpm/volt]
 
 //PWM 
 #define PWM_FREQUENCY 20000
@@ -23,8 +26,8 @@
 #define PWM_W 12
 
 //Current sensing
-#define SHUNT_RESISTOR 0.2
-#define CURRENT_SENSING_GAIN 0.005
+#define SHUNT_RESISTOR 0.003
+#define CURRENT_SENSING_GAIN 10
 
 #define I_U 32
 #define I_V 33

@@ -1,4 +1,8 @@
-/*#define ADC_U 32
+/*
+#include <Arduino.h>
+#include <WiFi.h>
+
+#define ADC_U 32
 #define PWM_U 27
 
 #define ADC_V 33
@@ -7,10 +11,13 @@
 #define ADC_W 25
 #define PWM_W 12
 
-//500 unità = 1A (U-V)
+// 500 unità = 1A (U-V)
 
-void setupa() {
-  Serial1.begin(115200,SERIAL_8N1,15,4);
+void setupa()
+{
+  WiFi.mode(WIFI_OFF);
+
+  Serial1.begin(115200, SERIAL_8N1, 15, 4);
   Serial1.println("ASDASDASD");
 
   pinMode(21, OUTPUT);
@@ -27,52 +34,49 @@ void setupa() {
   analogSetAttenuation(ADC_0db);
 
   digitalWrite(PWM_U, LOW);
-  digitalWrite(PWM_V,LOW);
-  digitalWrite(PWM_W,LOW);
+  digitalWrite(PWM_V, LOW);
+  digitalWrite(PWM_W, LOW);
 
   Serial1.println("Starting");
 
   digitalWrite(PWM_U, HIGH);
 
-  int readAvg=0;
+  int readAvg = 0;
 
-
-  for(int i=0;i<1000;i++){
-    readAvg+=(analogRead(ADC_U));
+  for (int i = 0; i < 1000; i++)
+  {
+    readAvg += (analogRead(ADC_U));
     delay(1);
   }
-
 
   digitalWrite(PWM_U, LOW);
 
   Serial1.println("Done");
 
   Serial1.println(readAvg);
-  Serial1.println(readAvg/1000);
-
+  Serial1.println(readAvg / 1000);
 }
 
-void loopa() {
+void loopa()
+{
   delay(5000);
 
   Serial1.println("Starting U");
 
   digitalWrite(PWM_U, HIGH);
 
-  int readAvg=0;
+  int readAvg = 0;
 
-
-  for(int i=0;i<1000;i++){
-    readAvg+=(analogRead(ADC_U));
+  for (int i = 0; i < 1000; i++)
+  {
+    readAvg += (analogRead(ADC_U));
     delay(1);
   }
 
-
   digitalWrite(PWM_U, LOW);
 
-
   Serial1.println(readAvg);
-  Serial1.println(readAvg/1000);
+  Serial1.println(readAvg / 1000);
 
   Serial1.println("Done U");
 
@@ -82,19 +86,18 @@ void loopa() {
 
   digitalWrite(PWM_V, HIGH);
 
-  readAvg=0;
+  readAvg = 0;
 
-  for(int i=0;i<1000;i++){
-    readAvg+=(analogRead(ADC_V));
+  for (int i = 0; i < 1000; i++)
+  {
+    readAvg += (analogRead(ADC_V));
     delay(1);
   }
 
-
   digitalWrite(PWM_V, LOW);
 
-
   Serial1.println(readAvg);
-  Serial1.println(readAvg/1000);
+  Serial1.println(readAvg / 1000);
 
   Serial1.println("Done V");
 
@@ -104,23 +107,21 @@ void loopa() {
 
   digitalWrite(PWM_W, HIGH);
 
-  readAvg=0;
+  readAvg = 0;
 
-  for(int i=0;i<1000;i++){
-    readAvg+=(analogRead(ADC_W));
+  for (int i = 0; i < 1000; i++)
+  {
+    readAvg += (analogRead(ADC_W));
     delay(1);
   }
 
-
   digitalWrite(PWM_W, LOW);
-
 
   Serial1.println(readAvg);
 
-  Serial1.println(readAvg/1000);
+  Serial1.println(readAvg / 1000);
 
   Serial1.println("Done W");
-
 }*/
 
 #include <SimpleFOC.h>
@@ -141,7 +142,7 @@ void doA() { sensorTest.handleA(); }
 void doB() { sensorTest.handleB(); }
 void doC() { sensorTest.handleC(); }
 
-void setup()
+void setupa()
 {
 
   pinMode(ENABLE_PIN, OUTPUT);
@@ -164,7 +165,7 @@ void setup()
   driverTest.voltage_power_supply = 16.8;
   // Max DC voltage allowed - default voltage_power_supply
   // driverTest.voltage_limit = 16.8;
-  
+
 
   // driver init
   driverTest.init();
@@ -183,7 +184,7 @@ void setup()
   delay(1000);
 }
 
-void loop()
+void loopa()
 {
   // iterative function updating the sensor internal variables
   // it is usually called in motor.loopFOC()

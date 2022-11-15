@@ -1,4 +1,5 @@
 #include <SimpleFOC.h>
+#include <WiFi.h>
 #include "headers.h"
 
 HardwareSerial logSerial = Serial1;
@@ -29,6 +30,9 @@ LowsideCurrentSense current_sense = LowsideCurrentSense(SHUNT_RESISTOR, CURRENT_
 TaskHandle_t TaskHandleSpeed;
 TaskHandle_t TaskHandleData;
 
+TaskHandle_t TaskHandle0;
+TaskHandle_t TaskHandle1;
+
 float currentAngle = 0;
 float currentSpeed = 0;
 
@@ -41,34 +45,42 @@ void initPins()
   pinMode(ENABLE_PIN, OUTPUT);
   digitalWrite(ENABLE_PIN, HIGH);
 
- /* pinMode(I_U, INPUT);
+  pinMode(22, OUTPUT);
+  digitalWrite(22, HIGH);
+
+  pinMode(I_U, INPUT);
   pinMode(I_V, INPUT);
-  pinMode(I_W, INPUT);*/
+  pinMode(I_W, INPUT);
 
   analogReadResolution(10);
   analogSetAttenuation(ADC_0db);
 
- /*pinMode(HALL_U, INPUT_PULLUP);
+  pinMode(HALL_U, INPUT_PULLUP);
   pinMode(HALL_V, INPUT_PULLUP);
-  pinMode(HALL_W, INPUT_PULLUP);*/
+  pinMode(HALL_W, INPUT_PULLUP);
 
- /* pinMode(PWM_U, OUTPUT);
+  pinMode(PWM_U, OUTPUT);
   pinMode(PWM_V, OUTPUT);
-  pinMode(PWM_W, OUTPUT);*/
+  pinMode(PWM_W, OUTPUT);
 }
 
-void setupa()
+void setup()
 {
+
+  WiFi.mode(WIFI_OFF);
 
   logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
 
-  delay(1000);
+  delay(500);
 
   initPins();
 
+  delay(100);
+
   // initialize sensor hardware
   logSerial.println("Initializing sensors");
+  sensor.pullup = Pullup::USE_INTERN;
   sensor.init();
   // hardware interrupt enable
   sensor.enableInterrupts(sensorA, sensorB, sensorC);
@@ -86,6 +98,8 @@ void setupa()
   logSerial.println("Driver OK");
 
   current_sense.linkDriver(&driver);
+
+  motor.voltage_sensor_align = 1.5;
 
   logSerial.println("Initializing commander");
   command.add('M', doMotor, "motor");
@@ -109,16 +123,16 @@ void setupa()
   logSerial.printf("Torque control type: %d \n", motor.torque_controller);
   motor.controller = MotionControlType::torque;
 
-  motor.PID_current_q.P = 5;
+  /*motor.PID_current_q.P = 5;
   motor.PID_current_q.I = 1000;
   motor.PID_current_d.P = 5;
   motor.PID_current_d.I = 1000;
   motor.LPF_current_q.Tf = 0.002f; // 1ms default
-  motor.LPF_current_d.Tf = 0.002f; // 1ms default
+  motor.LPF_current_d.Tf = 0.002f; // 1ms default*/
 
-  motor.voltage_limit = 16.8; // 16.8;
-  motor.current_limit = 4.3;
-  motor.velocity_limit = 100; //rad/s
+  motor.voltage_limit = 16.8;
+  // motor.current_limit = 4.3;
+  motor.velocity_limit = 100; // rad/s
 
   motor.foc_modulation = FOCModulationType::SinePWM;
   // initialize motor
@@ -142,7 +156,7 @@ void setupa()
   current_sense.gain_b = -5.0f;
   current_sense.gain_c = -5.0f;*/
 
-  current_sense.skip_align = true;
+  // current_sense.skip_align = true;
 
   logSerial.println("Motor pre FOC OK");
 
@@ -175,6 +189,24 @@ void setupa()
       5,
       &TaskHandleSpeed,
       1);*/
+
+  /*xTaskCreatePinnedToCore(
+      Task0,
+      "Task0",
+      5000,
+      NULL,
+      5,
+      &TaskHandle0,
+      0);*/
+
+  xTaskCreatePinnedToCore(
+      Task1,
+      "Task1",
+      5000,
+      NULL,
+      5,
+      &TaskHandle1,
+      0);
 
   //#endif
 }
@@ -255,17 +287,37 @@ void TaskPrintData(void *pvParameters)
   }
 }
 
-void loopa()
+/*void Task0(void *pvParameters)
 {
-  // FOC algorithm function
+  while (1)
+  {
+    // logSerial.println("Task 0");
+    motor.loopFOC();
+    motor.move();
+    delayMicroseconds(5);
+  }
+}*/
+
+void Task1(void *pvParameters)
+{
+  while (1)
+  {
+    // logSerial.println("Task 1");
+    motor.monitor();
+    command.run();
+    delay(1);
+  }
+}
+
+void loop()
+{
+
   motor.loopFOC();
   motor.move();
-
-  motor.monitor();
-  command.run();
+  // FOC algorithm function
 
   // motor.move();
 
-  //currentAngle = sensor.getAngle();
-  //currentSpeed = sensor.getVelocity();
+  // currentAngle = sensor.getAngle();
+  // currentSpeed = sensor.getVelocity();
 }
