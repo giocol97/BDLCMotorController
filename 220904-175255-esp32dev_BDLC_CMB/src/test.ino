@@ -1,6 +1,10 @@
 #include <SimpleFOC.h>
 #include <WiFi.h>
+#include <ArduinoJson.h>
+
 #include "headers.h"
+
+DynamicJsonDocument data(1024);
 
 HardwareSerial logSerial = Serial1;
 
@@ -20,9 +24,9 @@ BLDCDriver3PWM driver = BLDCDriver3PWM(PWM_U, PWM_V, PWM_W); // TODO
 //  BLDCMotor( pole_pairs , ( phase_resistance, KV_rating  optional) )
 BLDCMotor motor = BLDCMotor(POLE_PAIRS, PHASE_RESISTANCE, KV_RATING); //, 220); // TODO
 
-Commander command = Commander(logSerial);
+/*Commander command = Commander(logSerial);
 
-void doMotor(char *cmd) { command.motor(&motor, cmd); }
+void doMotor(char *cmd) { command.motor(&motor, cmd); }*/
 
 //  LowsideCurrentSense(float shunt_resistor, float gain, int pinA, int pinB, int pinC = _NC);
 LowsideCurrentSense current_sense = LowsideCurrentSense(SHUNT_RESISTOR, CURRENT_SENSING_GAIN, I_U, I_V, I_W);
@@ -32,13 +36,38 @@ TaskHandle_t TaskHandleData;
 
 TaskHandle_t TaskHandle0;
 TaskHandle_t TaskHandle1;
-
-float currentAngle = 0;
-float currentSpeed = 0;
+TaskHandle_t TaskHandleSerial;
 
 void sensorA() { sensor.handleA(); }
 void sensorB() { sensor.handleB(); }
 void sensorC() { sensor.handleC(); }
+
+// state variables
+
+float currentSpeed = 0;
+float currentAngle = 0;
+float lastSpeed = 0;
+
+float raw_speed[50] = {0};
+float raw_angle[50] = {0};
+
+int sensor_index = 0;
+
+#define UNDEFINED_VALUE -123456
+#define RAIL_LENGTH_DEBUG 500
+
+// web parameters TODO define defaults in header
+float vmax = 50;                          // rad/s
+float vmin = 20;                          // rad/s
+float rampDuration = UNDEFINED_VALUE;     // ms TODO use
+int pulseStart = RAIL_LENGTH_DEBUG * 0.1; // pulses
+int pulseStop = RAIL_LENGTH_DEBUG * 0.75; // pulses
+int pulseEnd = RAIL_LENGTH_DEBUG * 0.9;   // pulses
+float tend = 0.5;                         // V
+
+int timeoutStart = 0;
+bool closing = false;
+bool launchDebug = true;
 
 void initPins()
 {
@@ -68,6 +97,8 @@ void setup()
 {
 
   WiFi.mode(WIFI_OFF);
+
+  Serial.begin(LOG_BAUD);
 
   logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
@@ -101,8 +132,8 @@ void setup()
 
   motor.voltage_sensor_align = 1.5;
 
-  logSerial.println("Initializing commander");
-  command.add('M', doMotor, "motor");
+  /*logSerial.println("Initializing commander");
+  command.add('M', doMotor, "motor");*/
 
   // use monitoring with the BLDCMotor
   // monitoring port
@@ -118,10 +149,25 @@ void setup()
   motor.linkDriver(&driver);
 
   // set control loop type to be used
-  motor.torque_controller = TorqueControlType::foc_current;
+  motor.torque_controller = TorqueControlType::voltage;
   // motor.torque_controller = TorqueControlType::voltage;
   logSerial.printf("Torque control type: %d \n", motor.torque_controller);
-  motor.controller = MotionControlType::torque;
+  motor.controller = MotionControlType::velocity;
+
+  // controller configuration based on the control type
+  // velocity PID controller parameters
+  // default P=0.5 I = 10 D =0
+  motor.PID_velocity.P = 0.5;
+  motor.PID_velocity.I = 10;
+  motor.PID_velocity.D = 0.0;
+  // jerk control using voltage voltage ramp
+  // default value is 300 volts per sec  ~ 0.3V per millisecond
+  motor.PID_velocity.output_ramp = 50;
+
+  // velocity low pass filtering
+  // default 5ms - try different values to see what is the best.
+  // the lower the less filtered
+  motor.LPF_velocity.Tf = 0.001;
 
   /*motor.PID_current_q.P = 5;
   motor.PID_current_q.I = 1000;
@@ -132,7 +178,7 @@ void setup()
 
   motor.voltage_limit = 16.8;
   // motor.current_limit = 4.3;
-  motor.velocity_limit = 100; // rad/s
+  motor.velocity_limit = MAX_SPEED; // rad/s
 
   motor.foc_modulation = FOCModulationType::SinePWM;
   // initialize motor
@@ -190,128 +236,393 @@ void setup()
       &TaskHandleSpeed,
       1);*/
 
-  /*xTaskCreatePinnedToCore(
+  xTaskCreatePinnedToCore(
       Task0,
       "Task0",
       5000,
       NULL,
       5,
       &TaskHandle0,
-      0);*/
+      0);
 
   xTaskCreatePinnedToCore(
       Task1,
       "Task1",
       5000,
       NULL,
-      5,
+      10,
       &TaskHandle1,
-      0);
+      1);
+
+  xTaskCreatePinnedToCore(
+      TaskSerial,
+      "Taskserial",
+      5000,
+      NULL,
+      9,
+      &TaskHandleSerial,
+      1);
 
   //#endif
 }
 
-void TaskControlSpeed(void *pvParameters)
-{
-  float target_speeds[6] = {20.0, 160.0, 300.0, 380.0, 250.0, 80.0};
-  float target_currents[6] = {0.2, 0.8, 1.5, 2.0, 1.0, 0.5};
-
-  while (1)
-  {
-    /*for (int i = 0; i < 6; i++)
-    {
-      logSerial.print("Setting speed to ");
-      logSerial.print(target_speeds[i]);
-      logSerial.println(" rad/s");
-      motor.target = (target_speeds[i]);
-      vTaskDelay(3000);
-    }*/
-    for (int i = 0; i < 6; i++)
-    {
-      logSerial.print("Setting current to ");
-      logSerial.print(target_currents[i]);
-      logSerial.println(" A");
-      motor.target = (target_currents[i]);
-      // motor.current_sp = (target_currents[i]);
-      //  motor.target = 0.005;
-
-      vTaskDelay(5000);
-    }
-  }
-  // motor.target=(3.0 * -3.14);
-}
-
-void TaskPrintData(void *pvParameters)
-{
-
-  int curA, curB, curC = 0;
-
-  while (1)
-  {
-
-    /*currentSpeed=sensor.getVelocity();
-    currentAngle=sensor.getAngle();
-     logSerial.printf("Motor - Speed: %f rad/s, Angle: %f rad\n" ,
-                   currentSpeed, currentAngle );*/
-
-    logSerial.printf("voltages to phases: %f, %f, %f\n", motor.Ua, motor.Ub, motor.Uc);
-
-    /* for (int i = 0; i < 100; i++)
-     {
-       curA += analogRead(32);
-       curB += analogRead(33);
-       curC += analogRead(25);
-       delay(1);
-     }
-
-     curA /= 100;
-     curB /= 100;
-     curC /= 100;*/
-
-    PhaseCurrent_s currents;
-    currents = current_sense.getPhaseCurrents();
-    float current_mag = current_sense.getDCCurrent();
-
-    // logSerial.printf("Gains: %f, %f, %f\n", current_sense.gain_a, current_sense.gain_b, current_sense.gain_c);
-
-    logSerial.printf("Currents - A: %.2f, B: %.2f, C: %.2f, DC: %.2f\n", currents.a * 1000, currents.b * 1000, currents.c * 1000, current_mag * 1000);
-
-    DQCurrent_s currentsFOC = current_sense.getFOCCurrents(currentAngle);
-
-    logSerial.printf("FOC currents - D: %f, Q: %f\n", currentsFOC.d, currentsFOC.q);
-
-    // logSerial.printf("Analog reads: %d, %d, %d\n", analogRead(32), analogRead(33), analogRead(25));
-    //   logSerial.printf("READING CURRENTS: %d %d %d\n", curA, curB, curC);
-
-    delay(1000);
-  }
-}
-
-/*void Task0(void *pvParameters)
-{
-  while (1)
-  {
-    // logSerial.println("Task 0");
-    motor.loopFOC();
-    motor.move();
-    delayMicroseconds(5);
-  }
-}*/
-
-void Task1(void *pvParameters)
+void Task0(void *pvParameters) // task raccolta dati/commander
 {
   while (1)
   {
     // logSerial.println("Task 1");
-    motor.monitor();
-    command.run();
+    // motor.monitor();
+    // command.run();
+
+    if (sensor_index != 50)
+    {
+      raw_speed[sensor_index] = sensor.getVelocity();
+      raw_angle[sensor_index] = sensor.getAngle();
+      sensor_index++;
+    }
+    else
+    {
+      sensor_index = 0;
+      lastSpeed = currentSpeed;
+      currentSpeed = avgNoZero(raw_speed, 50);
+      currentAngle = avgNoZero(raw_angle, 50);
+    }
+
     delay(1);
+  }
+}
+
+void Task1(void *pvParameters) // task implementazione funzionalità
+{
+
+  while (1)
+  {
+    delay(50);
+
+    int pulses = radiansToImpulses(currentAngle);
+
+    DQVoltage_s voltage = motor.voltage;
+
+    data["time"] = millis();
+    data["angle"] = currentAngle;
+    data["pulses"] = pulses;
+    data["speed"] = currentSpeed;
+    data["voltage"] = voltage.q;
+    data["target"] = motor.target;
+    data["control"] = motor.controller;
+    // logSerial.println("Current angle: " + String(currentAngle) + " - Current speed: " + String(currentSpeed) + " - Current pulses: " + String(pulses) + " - Target: " + String(motor.target) + " - Voltage: " + String(voltage.q) + "/" + String(voltage.d));
+
+    /*logSerial.print(currentSpeed);
+    logSerial.print("\t");
+    logSerial.println(motor.target);*/
+
+    if (currentSpeed > 3 * vmax)
+    {
+      motor.controller = MotionControlType::velocity;
+      motor.target = 0.0;
+      continue;
+    }
+
+    if (launchDebug)
+    {
+
+      //logSerial.println("Event: launch debug");
+      motor.controller = MotionControlType::torque;
+      motor.target = 2.0;
+
+      if (timeoutStart == 0)
+      {
+        timeoutStart = millis();
+      }
+
+      if (millis() - timeoutStart > 1000)
+      {
+        //logSerial.println("Event:end launch debug");
+
+        launchDebug = false;
+        timeoutStart = 0;
+
+        motor.disable();
+
+        motor.controller = MotionControlType::velocity;
+        motor.target = 0.0;
+      }
+    }
+    else
+    {
+      // TODO put in state machine
+      if (pulses > pulseStart && currentSpeed > 0.7 * vmax && motor.target == 0 && timeoutStart == 0 && !closing)
+      {
+        //logSerial.println("Event: spinta");
+
+        motor.enable();
+
+        motor.controller = MotionControlType::velocity;
+        motor.target = vmax;
+      }
+
+      if (pulses > pulseStop && motor.target > vmin && timeoutStart == 0 && !closing)
+      {
+        //logSerial.println("Event: stop");
+        motor.controller = MotionControlType::velocity;
+        motor.target = vmin;
+      }
+
+      if (pulses > pulseEnd && motor.controller == MotionControlType::velocity && timeoutStart == 0 && !closing)
+      {
+        //logSerial.println("Event: stop torque");
+        motor.controller = MotionControlType::torque;
+        motor.target = tend;
+      }
+
+      if (timeoutStart == 0 && pulses > pulseEnd && motor.controller == MotionControlType::torque && (currentSpeed == 0 || pulses > RAIL_END_PULSES) && !closing)
+      {
+       // logSerial.println("Event: End");
+        motor.target = 0;
+        timeoutStart = millis();
+      }
+
+      if (timeoutStart != 0 && millis() - timeoutStart > 5000 && !closing)
+      {
+        //logSerial.println("Event: close");
+        motor.controller = MotionControlType::velocity;
+        motor.target = -vmin;
+        // timeoutStart = 0;
+        closing = true;
+      }
+
+      if (closing && (millis() - timeoutStart + 5000 > 500) && (pulses < pulseStart) && motor.controller == MotionControlType::velocity)
+      {
+        //logSerial.println("Event: close torque");
+
+        motor.controller = MotionControlType::torque;
+        motor.target = -tend;
+      }
+
+      if (closing && motor.controller == MotionControlType::torque && (currentSpeed == 0 || pulses < RAIL_END_PULSES * 0.05))
+      {
+        //logSerial.println("Event: back to start");
+        motor.target = 0;
+        closing = false;
+      }
+    }
+
+    /*loop test PID
+        if (millis() < 20000)
+        {
+          motor.target = 100;
+        }
+        else
+        {
+          if (millis() < 25000)
+          {
+            motor.target = 50;
+          }
+          else
+          {
+            if (millis() < 30000)
+            {
+              motor.target = 10;
+            }
+            else
+            {
+              if (millis() < 35000)
+              {
+                motor.target = -10;
+              }
+              else
+              {
+                motor.target = -50;
+              }
+            }
+          }
+        }*/
+    /* if (timeoutStart != 0 && millis() - timeoutStart > 3000)
+     {
+       if (motor.target == 0)
+       {
+         // timeout dopo fine operazioni, riporto a 0 impulsi
+         logSerial.println("Timeout triggered");
+         motor.target = -0.3;
+       }
+       else
+       {
+         if (pulses < BEGIN_RAMP_BEGIN_PULSES)
+         {
+           if (currentSpeed > -MAX_SPEED)
+           {
+             motor.target -= 0.1;
+           }
+
+           if (currentSpeed < -MIN_SPEED)
+           {
+             motor.target += 0.2;
+           }
+         }
+       }
+     }
+
+     logSerial.print("Current position: ");
+
+     if (pulses < CONTROL_START_PULSES)
+     {
+       // rail start - do nothing
+       logSerial.println("Rail start");
+     }
+     else if (pulses >= CONTROL_START_PULSES && pulses < END_RAMP_BEGIN_PULSES)
+     {
+       // rail control begin - control motor to start moving at fixed speed
+       logSerial.println("Rail control begin");
+       // motor.target=0.3;
+
+       // speed check
+       if (currentSpeed > MAX_SPEED && motor.target > 0)
+       {
+         motor.target -= 0.1;
+       }
+
+       if (currentSpeed < MIN_SPEED)
+       {
+         motor.target += 0.2;
+       }
+     }
+     else if (pulses >= END_RAMP_BEGIN_PULSES && pulses < END_RAMP_END_PULSES)
+     {
+       // rail ramp begin - start braking to lower speed
+       logSerial.println("Rail ramp begin");
+       if (motor.target > -0.1)
+       {
+         motor.target -= 0.01;
+       }
+     }
+     else if (pulses >= END_RAMP_END_PULSES && pulses < RAIL_END_PULSES)
+     {
+       // rail ramp end - disengage motor and leave
+       logSerial.println("Rail ramp end");
+       motor.target = 0;
+     }
+     else
+     { // pulses>=RAIL_END_PULSES
+       // rail end - do nothing
+       logSerial.println("Rail end");
+     }
+
+     if (pulses >= END_RAMP_END_PULSES && currentSpeed == 0 && timeoutStart == 0)
+     {
+       timeoutStart = millis();
+       logSerial.println("Timeout start");
+     }
+     */
+  }
+}
+
+void TaskSerial(void *pvParameters) // task comunicazione con seriale
+{
+
+  int lastSent = 0;
+  while (1)
+  {
+    if (millis() - lastSent > 500)
+    {
+      serializeJson(data, logSerial);
+      logSerial.println();
+    }
+
+    if (logSerial.available())
+    {
+      int tmpTarget = UNDEFINED_VALUE;
+      float tmpvmax = UNDEFINED_VALUE;
+      float tmpvmin = UNDEFINED_VALUE;
+      float tmprampDuration = UNDEFINED_VALUE;
+      int tmppulseStart = UNDEFINED_VALUE;
+      int tmppulseStop = UNDEFINED_VALUE;
+      int tmppulseEnd = UNDEFINED_VALUE;
+      float tmptend = UNDEFINED_VALUE;
+
+      String command = logSerial.readStringUntil('\n');
+
+      // check if string contains stop
+      if (command.indexOf("stop") >= 0)
+      {
+        motor.disable();
+        logSerial.println("Stop command received");
+      }
+
+      // check if string contains restart
+      if (command.indexOf("enable") >= 0)
+      {
+        motor.enable();
+        logSerial.println("Restart command received");
+      }
+
+      if (command.indexOf("reset") >= 0)
+      {
+        launchDebug = false;
+        timeoutStart = 0;
+
+        motor.disable();
+
+        motor.controller = MotionControlType::velocity;
+        motor.target = 0.0;
+        logSerial.println("Reset command received");
+      }
+
+      // check if string contains Set
+      if (command.indexOf("Set") < 0)
+      {
+        continue;
+      }
+
+      sscanf(command.c_str(), "Set;%d;%f;%f;%f;%d;%d;%d;%f", &tmpTarget, &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend);
+
+      // TODO check input
+      if (tmpTarget != UNDEFINED_VALUE)
+      {
+        motor.target = tmpTarget;
+      }
+
+      if (tmpvmax != UNDEFINED_VALUE)
+      {
+        vmax = tmpvmax;
+      }
+
+      if (tmpvmin != UNDEFINED_VALUE)
+      {
+        vmin = tmpvmin;
+      }
+
+      if (tmprampDuration != UNDEFINED_VALUE)
+      {
+        rampDuration = tmprampDuration;
+      }
+
+      if (tmppulseStart != UNDEFINED_VALUE)
+      {
+        pulseStart = tmppulseStart;
+      }
+
+      if (tmppulseStop != UNDEFINED_VALUE)
+      {
+        pulseStop = tmppulseStop;
+      }
+
+      if (tmppulseEnd != UNDEFINED_VALUE)
+      {
+        pulseEnd = tmppulseEnd;
+      }
+
+      if (tmptend != UNDEFINED_VALUE)
+      {
+        tend = tmptend;
+      }
+    }
+
+    delay(10);
   }
 }
 
 void loop()
 {
-
   motor.loopFOC();
   motor.move();
   // FOC algorithm function
