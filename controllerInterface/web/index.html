@@ -31,7 +31,7 @@
 
   <div class="container">
     <div class="row">
-      <div class="col-7" style="margin-top:3em;">
+      <div style="margin-top:3em;">
 
         <button type="button" class="btn btn-info" id="btn-stop" onclick="stopDrive()"
           style="font-size:x-large; margin-top:2em;">Stop</button>
@@ -43,21 +43,75 @@
           Dati:
         </h4>
 
-        <div class="dataElement"> Time: <div id="time">0</div></div>
-        <div class="dataElement"> Angle: <div id="angle">0</div></div>
-        <div class="dataElement"> Pulses: <div id="pulses">0</div></div>
-        <div class="dataElement"> Speed: <div id="speed">0</div></div>
-        <div class="dataElement"> Voltage: <div id="voltage">0</div></div>
-        <div class="dataElement"> Target: <div id="target">0</div></div>
-        <div class="dataElement"> Control type: <div id="control">0</div></div>
-        
+        <div class="row">
+          <div class="dataElement">
+            <div>Time:</div> <br>
+            <div id="time">0</div>
+          </div>
+          <!--<div class="dataElement">
+            <div>Angle:</div> <br>
+            <div id="angle">0</div>
+          </div>-->
+          <div class="dataElement">
+            <div>Pulses:</div> <br>
+            <div id="pulses">0</div>
+          </div>
+          <div class="dataElement">
+            <div>Speed:</div><br>
+            <div id="speed">0</div>
+          </div>
+          <div class="dataElement">
+            <div>Voltage:</div> <br>
+            <div id="voltage">0</div>
+          </div>
+          <div class="dataElement">
+            <div>Target:</div> <br>
+            <div id="target">0</div>
+          </div>
+          <div class="dataElement">
+            <div>Control:</div> <br>
+            <div id="control">0</div>
+          </div>
+          <div class="dataElement">
+            <div>State:</div><br>
+            <div id="state">0</div>
+          </div>
+        </div>
 
-        Log: <div id="logDiv"></div>
-
+        <!--
+        // web parameters TODO define defaults in header
+float vmax = 200;                         // rad/s
+float vmin = 50;                          // rad/s
+float rampDuration = UNDEFINED_VALUE;     // ms TODO use
+int pulseStart = RAIL_LENGTH_DEBUG * 0.1; // pulses
+int pulseStop = RAIL_LENGTH_DEBUG * 0.75; // pulses
+int pulseEnd = RAIL_LENGTH_DEBUG * 0.9;   // pulses
+float tend = 0.3;                         // V
+float tbrake = 0.3;
+long timeoutDuration = 5000;
         
+        sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration);-->
+        <div class="row">
+          <div>Rail Length: 1400 pulses</div>
+          <div class="input-box">vmax <input id="input-vmax" value="200" type="text"></div>
+          <div class="input-box">vmin <input id="input-vmin" value="50" type="text"></div>
+          <div class="input-box">ramp <input id="input-ramp" value="TODO" type="text"></div>
+          <div class="input-box">pulse start <input id="input-pulseStart" value="140" type="text"></div>
+          <div class="input-box">pulse stop <input id="input-pulseStop" value="1050" type="text"></div>
+          <div class="input-box">pulse end <input id="input-pulseEnd" value="1260" type="text"></div>
+          <div class="input-box">torque end <input id="input-tend" value="0.3" type="text"></div>
+          <div class="input-box">torque brake <input id="input-tbrake" value="0.3" type="text"></div>
+          <div class="input-box">timeout duration <input id="input-timeoutDuration" value="5000" type="text"></div>
+
+          <button class="btn btn-success" onclick="sendData()">Send</button>
+
+        </div>
+        <div class="row">
+          Log: <div id="logDiv"></div>
+
+        </div>
       </div>
     </div>
-  </div>
 </body>
 <script src="https://code.jquery.com/jquery-3.6.1.slim.min.js"
   integrity="sha256-w8CvhFs7iHNVUtnSP0YKEg00p9Ih13rlL9zGqvLdePA=" crossorigin="anonymous"></script>

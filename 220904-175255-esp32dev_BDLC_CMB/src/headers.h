@@ -30,8 +30,8 @@
 #define CURRENT_SENSING_GAIN 10
 
 #define I_U 32
-#define I_V 33
-#define I_W 25
+#define I_V 25
+#define I_W 33
 
 //per funzionalità
 //costanti di controllo
@@ -55,9 +55,10 @@
 #define STATE_INACTIVE 1
 #define STATE_SPINTA 2
 #define STATE_FRENATA 3
-#define STATE_FINECORSA 4
-#define STATE_RITORNO_VEL 5
-#define STATE_RITORNO_TOR 6
+#define STATE_QUASIFINECORSA 4
+#define STATE_FINECORSA 5
+#define STATE_RITORNO_VEL 6
+#define STATE_RITORNO_TOR 7
 
 float avgNoZero(float *arr, int size);
 int radiansToImpulses(float rad);

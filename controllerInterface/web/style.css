@@ -1,43 +1,44 @@
-.top-menu{
-    margin-top:1em;
-    display:flex;
+.top-menu {
+    margin-top: 1em;
+    display: flex;
 }
-.top-menu>h1{
+
+.top-menu>h1 {
     margin-right: 4em;
 }
 
-.top-menu>img{
+.top-menu>img {
     max-height: 80px;
 }
 
-.card-text{
-    font-size:large;
+.card-text {
+    font-size: large;
 }
 
-.alert-progress{
-    font-size:xx-large; 
-    margin-top:1em;
+.alert-progress {
+    font-size: xx-large;
+    margin-top: 1em;
     max-width: 50%;
     text-align: center;
 }
 
-.box-output-programmazione{
+.box-output-programmazione {
     background-color: lightgray;
     height: 40%;
     padding: 0.5em;
     overflow: auto;
-    font-size:smaller;
+    font-size: smaller;
 }
 
-.serial-box{
-    font-size:xxx-large;
+.serial-box {
+    font-size: xxx-large;
     border: 5px solid red;
     padding: 0 0.5em;
     border-radius: 10px;
     width: fit-content;
 }
 
-#btn-help{
+#btn-help {
     height: 40px;
     width: 40px;
     background-color: crimson;
@@ -48,21 +49,21 @@
     margin: 0 auto;
 }
 
-#btn-help:hover{
+#btn-help:hover {
     background-color: darkred;
     cursor: pointer;
 }
 
-#btns-language{
+#btns-language {
     height: 3em;
 }
 
-#btns-language>button{
+#btns-language>button {
     font-weight: bold;
     border-width: 3px;
 }
 
-#btn-start-twist{
+#btn-start-twist {
     position: absolute;
     left: 10%;
     top: 25%;
@@ -73,7 +74,7 @@
     padding-top: 4em;
 }
 
-#btn-start-handlebar{
+#btn-start-handlebar {
     position: absolute;
     right: 10%;
     top: 25%;
@@ -84,7 +85,7 @@
     padding-top: 2.5em;
 }
 
-#btn-start-controller{
+#btn-start-controller {
     position: absolute;
     right: 10%;
     bottom: 10%;
@@ -95,39 +96,39 @@
     padding-top: 2.5em;
 }
 
-#input-hub-serial{
+#input-hub-serial {
     max-width: 30%;
 }
 
-#btn-save-hub-serial{
+#btn-save-hub-serial {
     width: fit-content;
-    margin-top:1em;
-    margin-left:0.6em;
-    font-size:large;
+    margin-top: 1em;
+    margin-left: 0.6em;
+    font-size: large;
 }
 
-#btn-program-master{
+#btn-program-master {
     width: fit-content;
-    margin-top:3em;
-    margin-left:0.6em;
-    font-size:xxx-large;
+    margin-top: 3em;
+    margin-left: 0.6em;
+    font-size: xxx-large;
 }
 
 
 
-#btn-program-handlebar{
+#btn-program-handlebar {
     width: fit-content;
-    margin-top:2em;
-    margin-left:0.6em;
-    font-size:xxx-large;
+    margin-top: 2em;
+    margin-left: 0.6em;
+    font-size: xxx-large;
 }
 
-#button-copy-box-serial-handlebar{
-    font-size:small;
+#button-copy-box-serial-handlebar {
+    font-size: small;
 }
 
-#btn-controller-left{
-    display:inline;
+#btn-controller-left {
+    display: inline;
     max-width: 30%;
     height: 5em;
     font-size: x-large;
@@ -135,15 +136,15 @@
     margin-right: 1em;
 }
 
-#btn-controller-right{
-    display:inline;
+#btn-controller-right {
+    display: inline;
     max-width: 30%;
     height: 5em;
     font-size: x-large;
     font-weight: bolder;
 }
 
-#btn-reset-all{
+#btn-reset-all {
     font-weight: bolder;
     height: fit-content;
     font-size: larger;
@@ -151,7 +152,27 @@
 }
 
 
-.dataElement{
+.dataElement {
+    display: inline-flex;
     font-size: x-large;
     font-weight: bold;
+
+    border: 1px solid;
+    width: 10em;
+    height: 4em;
+}
+
+.input-box {
+    display: inline-flex;
+    font-size: large;
+    font-weight: bold;
+
+    border: 1px solid;
+    padding: 0.5em;
+    width: 20em;
+    margin: 0.5em;
+}
+
+.input-box input{
+    margin-left:0.5em;
 }

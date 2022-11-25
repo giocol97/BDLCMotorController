@@ -66,7 +66,7 @@ float rampDuration = UNDEFINED_VALUE;     // ms TODO use
 int pulseStart = RAIL_LENGTH_DEBUG * 0.1; // pulses
 int pulseStop = RAIL_LENGTH_DEBUG * 0.75; // pulses
 int pulseEnd = RAIL_LENGTH_DEBUG * 0.9;   // pulses
-float tend = 0.75;                        // V
+float tend = 0.3;                         // V
 float tbrake = 0.3;
 long timeoutDuration = 5000;
 
@@ -110,11 +110,11 @@ void setup()
   logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
 
-  delay(500);
+  //delay(500);
 
   initPins();
 
-  delay(100);
+  delay(50);
 
   // initialize sensor hardware
   logSerial.println("Initializing sensors");
@@ -193,6 +193,9 @@ void setup()
 
   delay(100);
 
+  // print current sense pins
+  //logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
+
   // init current sense
   if (current_sense.init())
     logSerial.println("Current sense init success!");
@@ -209,13 +212,13 @@ void setup()
   current_sense.gain_b = -5.0f;
   current_sense.gain_c = -5.0f;*/
 
-  // current_sense.skip_align = true;
+  current_sense.skip_align = true;
 
   logSerial.println("Motor pre FOC OK");
 
   delay(100);
 
-  motor.initFOC();
+  motor.initFOC(0.0, Direction::CCW);
   logSerial.println("Motor OK");
 
   logSerial.println("Done configuring");
@@ -223,7 +226,11 @@ void setup()
   motor.disable();
   digitalWrite(ENABLE_PIN, LOW);
 
-  delay(1000);
+  //delay(1000);
+
+  //logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
+
+  currentSystemState = STATE_INACTIVE;
 
   // motor.target = (300);
 
@@ -332,7 +339,13 @@ bool updateState(int pulses, float speed, int millis)
     }
     break;
   case STATE_FRENATA:
-    if (pulses > pulseEnd && speed == 0)
+    if (pulses > pulseEnd)
+    {
+      currentSystemState = STATE_QUASIFINECORSA;
+    }
+    break;
+  case STATE_QUASIFINECORSA:
+    if (speed == 0)
     { // TODO mettere speed "circa" 0?
       currentSystemState = STATE_FINECORSA;
     }
@@ -340,6 +353,7 @@ bool updateState(int pulses, float speed, int millis)
   case STATE_FINECORSA:
     if (millis - timeoutStart > timeoutDuration /* || speed < -vmax*/)
     {
+      timeoutStart = 0;
       currentSystemState = STATE_RITORNO_VEL;
     }
     break;
@@ -370,14 +384,6 @@ void Task1(void *pvParameters) // task implementazione funzionalità
 
     DQVoltage_s voltage = motor.voltage;
 
-    data["time"] = millis();
-    data["angle"] = currentAngle;
-    data["pulses"] = pulses;
-    data["speed"] = currentSpeed;
-    data["voltage"] = voltage.q;
-    data["target"] = motor.target;
-    data["control"] = motor.controller;
-    data["state"] = state;
     // logSerial.println("Current angle: " + String(currentAngle) + " - Current speed: " + String(currentSpeed) + " - Current pulses: " + String(pulses) + " - Target: " + String(motor.target) + " - Voltage: " + String(voltage.q) + "/" + String(voltage.d));
 
     /*logSerial.print(currentSpeed);
@@ -391,7 +397,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
       continue;
     }*/
 
-    if (launchDebug)
+    if (launchDebug) // usato per simulare lancio di anta su sistema con volano
     {
 
       // logSerial.println("Event: launch debug");
@@ -418,8 +424,62 @@ void Task1(void *pvParameters) // task implementazione funzionalità
     }
     else
     {
-      // TODO put in state machine
-      if (state == 0 && pulses > pulseStart && currentSpeed > vmax && motor.target == 0 && timeoutStart == 0 && !closing)
+
+      if (!updateState(pulses, currentSpeed, millis()))
+      {
+        logSerial.println("Error, invalid state");
+        motor.disable();
+        continue;
+      }
+
+      // esecuzione comandi a motore
+
+      switch (currentSystemState)
+      {
+      case STATE_INACTIVE:
+        motor.target = 0;
+        if (motor.enabled)
+        {
+          motor.disable();
+          digitalWrite(ENABLE_PIN, LOW);
+        }
+        break;
+      case STATE_SPINTA:
+        if (!motor.enabled)
+        {
+          digitalWrite(ENABLE_PIN, HIGH);
+          motor.enable();
+          motor.controller = MotionControlType::torque;
+        }
+
+        motor.target = -brakeVoltage(currentSpeed);
+        break;
+      case STATE_FRENATA:
+        motor.controller = MotionControlType::velocity;
+        motor.target = vmin;
+        break;
+      case STATE_QUASIFINECORSA:
+        motor.controller = MotionControlType::torque;
+        motor.target = tend;
+        break;
+      case STATE_FINECORSA:
+        motor.target = 0;
+        if (timeoutStart == 0)
+        {
+          timeoutStart = millis();
+        }
+        break;
+      case STATE_RITORNO_VEL:
+        motor.controller = MotionControlType::velocity;
+        motor.target = -vmin;
+        break;
+      case STATE_RITORNO_TOR:
+        motor.controller = MotionControlType::torque;
+        motor.target = -tend;
+        break;
+      }
+
+      if (false && state == 0 && pulses > pulseStart && currentSpeed > vmax && motor.target == 0 && timeoutStart == 0 && !closing)
       {
         // logSerial.println("Event: spinta");
         digitalWrite(ENABLE_PIN, HIGH);
@@ -431,12 +491,12 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         state++;
       }
 
-      if (state == 1 && pulses < pulseStop)
+      if (false && state == 1 && pulses < pulseStop)
       {
         motor.target = -brakeVoltage(currentSpeed);
       }
 
-      if (state == 1 && pulses > pulseStop /*&& motor.target == -tbrake*/ && timeoutStart == 0 && !closing)
+      if (false && state == 1 && pulses > pulseStop /*&& motor.target == -tbrake*/ && timeoutStart == 0 && !closing)
       {
         // logSerial.println("Event: stop");
         motor.controller = MotionControlType::velocity;
@@ -444,7 +504,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         state++;
       }
 
-      if (state == 2 && pulses > pulseEnd && motor.controller == MotionControlType::velocity && timeoutStart == 0 && !closing)
+      if (false && state == 2 && pulses > pulseEnd && motor.controller == MotionControlType::velocity && timeoutStart == 0 && !closing)
       {
         // logSerial.println("Event: stop torque");
         motor.controller = MotionControlType::torque;
@@ -452,7 +512,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         state++;
       }
 
-      if (state == 3 && timeoutStart == 0 && pulses > pulseEnd && motor.controller == MotionControlType::torque && (currentSpeed == 0 || pulses > RAIL_END_PULSES) && !closing)
+      if (false && state == 3 && timeoutStart == 0 && pulses > pulseEnd && motor.controller == MotionControlType::torque && (currentSpeed == 0 || pulses > RAIL_END_PULSES) && !closing)
       {
         // logSerial.println("Event: End");
         motor.target = 0;
@@ -460,7 +520,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         state++;
       }
 
-      if (state == 4 && timeoutStart != 0 && millis() - timeoutStart > 5000 && !closing)
+      if (false && state == 4 && timeoutStart != 0 && millis() - timeoutStart > 5000 && !closing)
       {
         // logSerial.println("Event: close");
         motor.controller = MotionControlType::velocity;
@@ -470,7 +530,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         state++;
       }
 
-      if (state == 5 && closing && (millis() - timeoutStart + 5000 > 500) && (pulses < pulseStart) && motor.controller == MotionControlType::velocity)
+      if (false && state == 5 && closing && (millis() - timeoutStart + 5000 > 500) && (pulses < pulseStart) && motor.controller == MotionControlType::velocity)
       {
         // logSerial.println("Event: close torque");
 
@@ -479,7 +539,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         state++;
       }
 
-      if (state == 6 && closing && motor.controller == MotionControlType::torque && (currentSpeed == 0 /*|| pulses < RAIL_END_PULSES * 0.05*/))
+      if (false && state == 6 && closing && motor.controller == MotionControlType::torque && (currentSpeed == 0 /*|| pulses < RAIL_END_PULSES * 0.05*/))
       {
         // logSerial.println("Event: back to start");
         motor.target = 0;
@@ -495,6 +555,15 @@ void Task1(void *pvParameters) // task implementazione funzionalità
       // if (state == 0 && pulses > pulseStart && currentSpeed > vmax && motor.target == 0 && timeoutStart == 0 && !closing)
     }
 
+    data["time"] = millis();
+    //data["angle"] = currentAngle;
+    data["pulses"] = pulses;
+    data["speed"] = currentSpeed;
+    data["voltage"] = voltage.q;
+    data["target"] = motor.target;
+    data["control"] = motor.controller;
+    data["state"] = currentSystemState;
+    // serializeJson(data, logSerial); su altro task
   }
 }
 
@@ -504,7 +573,7 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
   int lastSent = 0;
   while (1)
   {
-    if (millis() - lastSent > 250)
+    if (millis() - lastSent > 100)
     {
       serializeJson(data, logSerial);
       logSerial.println();
@@ -521,6 +590,8 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       int tmppulseStop = UNDEFINED_VALUE;
       int tmppulseEnd = UNDEFINED_VALUE;
       float tmptend = UNDEFINED_VALUE;
+      float tmptbrake = UNDEFINED_VALUE;
+      int tmptimeoutDuration = UNDEFINED_VALUE;
 
       String command = logSerial.readStringUntil('\n');
 
@@ -535,20 +606,15 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       if (command.indexOf("enable") >= 0)
       {
         motor.enable();
-        logSerial.println("Restart command received");
+        logSerial.println("enable command received");
       }
 
       if (command.indexOf("reset") >= 0)
       {
-        launchDebug = false;
-        timeoutStart = 0;
-
-        motor.disable();
-
-        motor.controller = MotionControlType::velocity;
-        motor.target = 0.0;
-        logSerial.println("Reset command received");
+        ESP.restart();
       }
+
+    logSerial.println("Command received: " + command);
 
       // check if string contains Set
       if (command.indexOf("Set") < 0)
@@ -556,13 +622,13 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         continue;
       }
 
-      sscanf(command.c_str(), "Set;%d;%f;%f;%f;%d;%d;%d;%f", &tmpTarget, &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend);
+      sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration);
 
       // TODO check input
-      if (tmpTarget != UNDEFINED_VALUE)
+      /*if (tmpTarget != UNDEFINED_VALUE)
       {
         motor.target = tmpTarget;
-      }
+      }*/
 
       if (tmpvmax != UNDEFINED_VALUE)
       {
@@ -598,6 +664,18 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       {
         tend = tmptend;
       }
+
+      if (tmptbrake != UNDEFINED_VALUE)
+      {
+        tbrake = tmptbrake;
+      }
+
+      if (tmptimeoutDuration != UNDEFINED_VALUE)
+      {
+        timeoutDuration = tmptimeoutDuration;
+      }
+
+      logSerial.printf("Set parameters: vmax=%f, vmin=%f, rampDuration=%f, pulseStart=%d, pulseStop=%d, pulseEnd=%d, tend=%f, tbrake=%f, timeoutDuration=%d\n", vmax, vmin, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration);
     }
 
     delay(10);
