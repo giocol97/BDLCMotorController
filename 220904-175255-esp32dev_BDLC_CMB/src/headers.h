@@ -48,6 +48,17 @@
 #define END_RAMP_END_PULSES 500
 #define RAIL_END_PULSES 600
 
+
+//stati per macchina a stati
+
+#define STATE_START 0
+#define STATE_INACTIVE 1
+#define STATE_SPINTA 2
+#define STATE_FRENATA 3
+#define STATE_FINECORSA 4
+#define STATE_RITORNO_VEL 5
+#define STATE_RITORNO_TOR 6
+
 float avgNoZero(float *arr, int size);
 int radiansToImpulses(float rad);
 float impulsesToRadians(int impulses);
