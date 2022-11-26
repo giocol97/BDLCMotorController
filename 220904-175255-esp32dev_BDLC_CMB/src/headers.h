@@ -57,8 +57,9 @@
 #define STATE_FRENATA 3
 #define STATE_QUASIFINECORSA 4
 #define STATE_FINECORSA 5
-#define STATE_RITORNO_VEL 6
-#define STATE_RITORNO_TOR 7
+#define STATE_INIZIO_RITORNO 6
+#define STATE_RITORNO_VEL 7
+#define STATE_RITORNO_TOR 8
 
 float avgNoZero(float *arr, int size);
 int radiansToImpulses(float rad);

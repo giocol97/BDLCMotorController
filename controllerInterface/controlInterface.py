@@ -16,14 +16,14 @@ def enable_drive():
 @eel.expose
 def reset_drive():
     ser.write(b'reset\n')
-    
+
 @eel.expose
 def send_set_packet(txt):
     ser.write(txt.encode('utf-8')+'\n'.encode('utf-8'))
 
 def serial_thread():
     global ser
-    ser = serial.Serial('COM16', 115200, timeout=1)
+    ser = serial.Serial('COM3', 115200, timeout=1)
 
     while True:
         eel.sleep(0.001)

@@ -34,9 +34,9 @@
       <div style="margin-top:3em;">
 
         <button type="button" class="btn btn-info" id="btn-stop" onclick="stopDrive()"
-          style="font-size:x-large; margin-top:2em;">Stop</button>
-        <button type="button" class="btn btn-info" onclick="enableDrive()"
-          style="font-size:x-large; margin-top:2em;">Enable</button>
+          style="font-size:x-large; margin-top:2em;">Disable</button>
+        <!--<button type="button" class="btn btn-info" onclick="enableDrive()"
+          style="font-size:x-large; margin-top:2em;">Enable</button>-->
         <button type="button" class="btn btn-info" onclick="resetDrive()"
           style="font-size:x-large; margin-top:2em;">Reset</button>
         <h4>
@@ -92,21 +92,22 @@ long timeoutDuration = 5000;
         
         sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration);-->
         <div class="row">
-          <div>Rail Length: 1400 pulses</div>
           <div class="input-box">vmax <input id="input-vmax" value="200" type="text"></div>
           <div class="input-box">vmin <input id="input-vmin" value="50" type="text"></div>
-          <div class="input-box">ramp <input id="input-ramp" value="TODO" type="text"></div>
-          <div class="input-box">pulse start <input id="input-pulseStart" value="140" type="text"></div>
-          <div class="input-box">pulse stop <input id="input-pulseStop" value="1050" type="text"></div>
-          <div class="input-box">pulse end <input id="input-pulseEnd" value="1260" type="text"></div>
+          <div class="input-box">rail length <input id="input-rail" value="1280" type="text"></div>
+          <div class="input-box">pulse start <input id="input-pulseStart" value="0.1" type="text"></div>
+          <div class="input-box">pulse stop <input id="input-pulseStop" value="0.75" type="text"></div>
+          <div class="input-box">pulse end <input id="input-pulseEnd" value="0.9" type="text"></div>
           <div class="input-box">torque end <input id="input-tend" value="0.3" type="text"></div>
           <div class="input-box">torque brake <input id="input-tbrake" value="0.3" type="text"></div>
           <div class="input-box">timeout duration <input id="input-timeoutDuration" value="5000" type="text"></div>
+
 
           <button class="btn btn-success" onclick="sendData()">Send</button>
 
         </div>
         <div class="row">
+          <button class="btn btn-danger" onclick="clearlog()">clear</button>
           Log: <div id="logDiv"></div>
 
         </div>

@@ -57,7 +57,7 @@ float raw_angle[50] = {0};
 int sensor_index = 0;
 
 #define UNDEFINED_VALUE -123456
-#define RAIL_LENGTH_DEBUG 1400
+#define RAIL_LENGTH_DEBUG 1280
 
 // web parameters TODO define defaults in header
 float vmax = 200;                         // rad/s
@@ -110,7 +110,7 @@ void setup()
   logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
 
-  //delay(500);
+  // delay(500);
 
   initPins();
 
@@ -194,7 +194,7 @@ void setup()
   delay(100);
 
   // print current sense pins
-  //logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
+  // logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
 
   // init current sense
   if (current_sense.init())
@@ -226,9 +226,9 @@ void setup()
   motor.disable();
   digitalWrite(ENABLE_PIN, LOW);
 
-  //delay(1000);
+  // delay(1000);
 
-  //logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
+  // logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
 
   currentSystemState = STATE_INACTIVE;
 
@@ -354,6 +354,12 @@ bool updateState(int pulses, float speed, int millis)
     if (millis - timeoutStart > timeoutDuration /* || speed < -vmax*/)
     {
       timeoutStart = 0;
+      currentSystemState = STATE_INIZIO_RITORNO;
+    }
+    break;
+  case STATE_INIZIO_RITORNO:
+    if (speed < -vmin - 10 /*|| pulses > pulseEnd*/)
+    {
       currentSystemState = STATE_RITORNO_VEL;
     }
     break;
@@ -366,6 +372,7 @@ bool updateState(int pulses, float speed, int millis)
   case STATE_RITORNO_TOR:
     if (speed == 0)
     {
+      sensor.electric_rotations = 0;
       currentSystemState = STATE_INACTIVE;
     }
     break;
@@ -382,7 +389,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
 
     int pulses = radiansToImpulses(currentAngle);
 
-    DQVoltage_s voltage = motor.voltage;
+    //DQVoltage_s voltage = motor.voltage;
 
     // logSerial.println("Current angle: " + String(currentAngle) + " - Current speed: " + String(currentSpeed) + " - Current pulses: " + String(pulses) + " - Target: " + String(motor.target) + " - Voltage: " + String(voltage.q) + "/" + String(voltage.d));
 
@@ -437,6 +444,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
       switch (currentSystemState)
       {
       case STATE_INACTIVE:
+        // TODO reset inizio corsa
         motor.target = 0;
         if (motor.enabled)
         {
@@ -452,114 +460,59 @@ void Task1(void *pvParameters) // task implementazione funzionalità
           motor.controller = MotionControlType::torque;
         }
 
-        motor.target = -brakeVoltage(currentSpeed);
+        motor.target = brakeVoltage(currentSpeed);
         break;
       case STATE_FRENATA:
         motor.controller = MotionControlType::velocity;
-        motor.target = vmin;
+        motor.target = -vmin;
         break;
       case STATE_QUASIFINECORSA:
         motor.controller = MotionControlType::torque;
-        motor.target = tend;
+        motor.target = -tend;
         break;
       case STATE_FINECORSA:
+        // TODO reset fine corsa
         motor.target = 0;
+
+        if (motor.enabled)
+        {
+          motor.disable();
+          digitalWrite(ENABLE_PIN, LOW);
+        }
+
         if (timeoutStart == 0)
         {
           timeoutStart = millis();
         }
         break;
+      case STATE_INIZIO_RITORNO:
+        if (!motor.enabled)
+        {
+          digitalWrite(ENABLE_PIN, HIGH);
+          motor.enable();
+        }
+
+        motor.controller = MotionControlType::torque;
+
+        motor.target += 0.05;
+
+        break;
       case STATE_RITORNO_VEL:
         motor.controller = MotionControlType::velocity;
-        motor.target = -vmin;
+        motor.target = vmin + 20;
         break;
       case STATE_RITORNO_TOR:
         motor.controller = MotionControlType::torque;
-        motor.target = -tend;
+        motor.target = tend * 1.2;
         break;
       }
-
-      if (false && state == 0 && pulses > pulseStart && currentSpeed > vmax && motor.target == 0 && timeoutStart == 0 && !closing)
-      {
-        // logSerial.println("Event: spinta");
-        digitalWrite(ENABLE_PIN, HIGH);
-
-        motor.enable();
-
-        motor.controller = MotionControlType::torque;
-        motor.target = -brakeVoltage(currentSpeed);
-        state++;
-      }
-
-      if (false && state == 1 && pulses < pulseStop)
-      {
-        motor.target = -brakeVoltage(currentSpeed);
-      }
-
-      if (false && state == 1 && pulses > pulseStop /*&& motor.target == -tbrake*/ && timeoutStart == 0 && !closing)
-      {
-        // logSerial.println("Event: stop");
-        motor.controller = MotionControlType::velocity;
-        motor.target = vmin;
-        state++;
-      }
-
-      if (false && state == 2 && pulses > pulseEnd && motor.controller == MotionControlType::velocity && timeoutStart == 0 && !closing)
-      {
-        // logSerial.println("Event: stop torque");
-        motor.controller = MotionControlType::torque;
-        motor.target = tend;
-        state++;
-      }
-
-      if (false && state == 3 && timeoutStart == 0 && pulses > pulseEnd && motor.controller == MotionControlType::torque && (currentSpeed == 0 || pulses > RAIL_END_PULSES) && !closing)
-      {
-        // logSerial.println("Event: End");
-        motor.target = 0;
-        timeoutStart = millis();
-        state++;
-      }
-
-      if (false && state == 4 && timeoutStart != 0 && millis() - timeoutStart > 5000 && !closing)
-      {
-        // logSerial.println("Event: close");
-        motor.controller = MotionControlType::velocity;
-        motor.target = -vmin;
-        // timeoutStart = 0;
-        closing = true;
-        state++;
-      }
-
-      if (false && state == 5 && closing && (millis() - timeoutStart + 5000 > 500) && (pulses < pulseStart) && motor.controller == MotionControlType::velocity)
-      {
-        // logSerial.println("Event: close torque");
-
-        motor.controller = MotionControlType::torque;
-        motor.target = -tend / 2;
-        state++;
-      }
-
-      if (false && state == 6 && closing && motor.controller == MotionControlType::torque && (currentSpeed == 0 /*|| pulses < RAIL_END_PULSES * 0.05*/))
-      {
-        // logSerial.println("Event: back to start");
-        motor.target = 0;
-        closing = false;
-        state = 0;
-        timeoutStart = 0;
-
-        motor.disable();
-        digitalWrite(ENABLE_PIN, LOW);
-        // motor.sensor_offset=currentAngle; TODO
-      }
-
-      // if (state == 0 && pulses > pulseStart && currentSpeed > vmax && motor.target == 0 && timeoutStart == 0 && !closing)
     }
 
     data["time"] = millis();
-    //data["angle"] = currentAngle;
+    // data["angle"] = currentAngle;
     data["pulses"] = pulses;
     data["speed"] = currentSpeed;
-    data["voltage"] = voltage.q;
+    data["voltage"] = 0.0f;
     data["target"] = motor.target;
     data["control"] = motor.controller;
     data["state"] = currentSystemState;
@@ -614,7 +567,7 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         ESP.restart();
       }
 
-    logSerial.println("Command received: " + command);
+      logSerial.println("Command received: " + command);
 
       // check if string contains Set
       if (command.indexOf("Set") < 0)
