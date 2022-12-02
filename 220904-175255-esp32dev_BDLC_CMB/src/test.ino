@@ -61,7 +61,11 @@ int sensor_index = 0;
 
 // web parameters TODO define defaults in header
 float vmax = 200;                         // rad/s
+float vmax_frenata = 400;                 // rad/s
+float vmin_frenata = 50;                  // rad/s
+float c_frenata = 5;                      // V*10
 float vmin = 50;                          // rad/s
+float v_tocco = 50;                       // rad/s
 float rampDuration = UNDEFINED_VALUE;     // ms TODO use
 int pulseStart = RAIL_LENGTH_DEBUG * 0.1; // pulses
 int pulseStop = RAIL_LENGTH_DEBUG * 0.75; // pulses
@@ -311,7 +315,7 @@ void Task0(void *pvParameters) // task raccolta dati/commander
 
 float brakeVoltage(float speed)
 {
-  return map(speed, 50, 200, 0, 5) / 10;
+  return map(speed, vmin_frenata, vmax_frenata, 0, c_frenata) / 10;
 }
 
 bool updateState(int pulses, float speed, int millis)
@@ -351,7 +355,7 @@ bool updateState(int pulses, float speed, int millis)
     }
     break;
   case STATE_FINECORSA:
-    if (millis - timeoutStart > timeoutDuration /* || speed < -vmax*/)
+    if (millis - timeoutStart > timeoutDuration  || speed < -v_tocco)
     {
       timeoutStart = 0;
       currentSystemState = STATE_INIZIO_RITORNO;
@@ -389,7 +393,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
 
     int pulses = radiansToImpulses(currentAngle);
 
-    //DQVoltage_s voltage = motor.voltage;
+    // DQVoltage_s voltage = motor.voltage;
 
     // logSerial.println("Current angle: " + String(currentAngle) + " - Current speed: " + String(currentSpeed) + " - Current pulses: " + String(pulses) + " - Target: " + String(motor.target) + " - Voltage: " + String(voltage.q) + "/" + String(voltage.d));
 
@@ -538,6 +542,10 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       int tmpTarget = UNDEFINED_VALUE;
       float tmpvmax = UNDEFINED_VALUE;
       float tmpvmin = UNDEFINED_VALUE;
+      float tmpvmaxfrenata = UNDEFINED_VALUE;
+      float tmpvminfrenata= UNDEFINED_VALUE;
+      float tmpcfrenata = UNDEFINED_VALUE;
+      float tmpvtocco = UNDEFINED_VALUE;
       float tmprampDuration = UNDEFINED_VALUE;
       int tmppulseStart = UNDEFINED_VALUE;
       int tmppulseStop = UNDEFINED_VALUE;
@@ -575,7 +583,7 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         continue;
       }
 
-      sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration);
+      sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d;%f;%f;%f;%f", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration, &tmpvmaxfrenata, &tmpvminfrenata, &tmpcfrenata, &tmpvtocco);
 
       // TODO check input
       /*if (tmpTarget != UNDEFINED_VALUE)
@@ -628,7 +636,27 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         timeoutDuration = tmptimeoutDuration;
       }
 
-      logSerial.printf("Set parameters: vmax=%f, vmin=%f, rampDuration=%f, pulseStart=%d, pulseStop=%d, pulseEnd=%d, tend=%f, tbrake=%f, timeoutDuration=%d\n", vmax, vmin, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration);
+      if(tmpvmaxfrenata != UNDEFINED_VALUE)
+      {
+        vmax_frenata = tmpvmaxfrenata;
+      }
+
+      if(tmpvminfrenata != UNDEFINED_VALUE)
+      {
+        vmin_frenata = tmpvminfrenata;
+      }
+
+      if(tmpcfrenata != UNDEFINED_VALUE)
+      {
+        c_frenata = tmpcfrenata;
+      }
+
+      if(tmpvtocco != UNDEFINED_VALUE)
+      {
+        v_tocco = tmpvtocco;
+      }
+
+      logSerial.printf("Set parameters: vmax=%f, vmin=%f, rampDuration=%f, pulseStart=%d, pulseStop=%d, pulseEnd=%d, tend=%f, tbrake=%f, timeoutDuration=%d, vmax_frenata=%f, vmin_frenata=%f, c_frenata=%f, v_tocco=%f\n", vmax, vmin, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration, vmax_frenata, vmin_frenata, c_frenata, v_tocco);
     }
 
     delay(10);
