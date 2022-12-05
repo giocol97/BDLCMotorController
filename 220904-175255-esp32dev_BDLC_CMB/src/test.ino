@@ -57,25 +57,26 @@ float raw_angle[50] = {0};
 int sensor_index = 0;
 
 #define UNDEFINED_VALUE -123456
-#define RAIL_LENGTH_DEBUG 1280
+#define RAIL_LENGTH_DEBUG 2190
 
 // web parameters TODO define defaults in header
-float vmax = 200;                         // rad/s
+float vmax = 100;                         // rad/s
 float vmax_frenata = 400;                 // rad/s
-float vmin_frenata = 50;                  // rad/s
-float c_frenata = 5;                      // V*10
+float vmin_frenata = 200;                 // rad/s
+float c_frenata = 3;                      // V*10
 float vmin = 50;                          // rad/s
-float v_tocco = 50;                       // rad/s
+float v_tocco = 25;                       // rad/s
 float rampDuration = UNDEFINED_VALUE;     // ms TODO use
 int pulseStart = RAIL_LENGTH_DEBUG * 0.1; // pulses
 int pulseStop = RAIL_LENGTH_DEBUG * 0.75; // pulses
 int pulseEnd = RAIL_LENGTH_DEBUG * 0.9;   // pulses
 float tend = 0.3;                         // V
-float tbrake = 0.3;
-long timeoutDuration = 5000;
+float tbrake = 0.7;
+long timeoutDuration = 10000;
 
 int state = 0;
 
+long endSetupMillis = 0;
 int timeoutStart = 0;
 bool closing = false;
 bool launchDebug = false;
@@ -233,8 +234,10 @@ void setup()
   // delay(1000);
 
   // logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
+  delay(500);
 
-  currentSystemState = STATE_INACTIVE;
+  currentSystemState = STATE_START;
+  endSetupMillis = millis();
 
   // motor.target = (300);
 
@@ -312,6 +315,13 @@ void Task0(void *pvParameters) // task raccolta dati/commander
     delay(1);
   }
 }
+/*
+float vmax = 100;                         // rad/s
+float vmax_frenata = 500;                 // rad/s
+float vmin_frenata = 150;                 // rad/s
+float c_frenata = 3;                      // V*10
+float vmin = 50;                          // rad/s
+*/
 
 float brakeVoltage(float speed)
 {
@@ -323,8 +333,11 @@ bool updateState(int pulses, float speed, int millis)
   switch (currentSystemState)
   {
   case STATE_START:
-    logSerial.println("Error, invalid state");
-    return false;
+    if (millis - endSetupMillis > 2000 && speed == 0)
+    {
+      sensor.electric_rotations = 0;
+      currentSystemState = STATE_INACTIVE;
+    }
     break;
   case STATE_INACTIVE:
     if (pulses > pulseStart && speed > vmax)
@@ -337,7 +350,7 @@ bool updateState(int pulses, float speed, int millis)
     }
     break;
   case STATE_SPINTA:
-    if (pulses > pulseStop)
+    if (pulses > pulseStop || speed < vmin)
     {
       currentSystemState = STATE_FRENATA;
     }
@@ -355,7 +368,7 @@ bool updateState(int pulses, float speed, int millis)
     }
     break;
   case STATE_FINECORSA:
-    if (millis - timeoutStart > timeoutDuration  || speed < -v_tocco)
+    if (millis - timeoutStart > timeoutDuration || speed < -v_tocco)
     {
       timeoutStart = 0;
       currentSystemState = STATE_INIZIO_RITORNO;
@@ -392,6 +405,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
     delay(50);
 
     int pulses = radiansToImpulses(currentAngle);
+    float targetSpinta = 0;
 
     // DQVoltage_s voltage = motor.voltage;
 
@@ -447,6 +461,17 @@ void Task1(void *pvParameters) // task implementazione funzionalità
 
       switch (currentSystemState)
       {
+      case STATE_START:
+        if (!motor.enabled)
+        {
+          digitalWrite(ENABLE_PIN, HIGH);
+          motor.enable();
+          motor.controller = MotionControlType::torque;
+        }
+
+        //motor.controller = MotionControlType::torque;
+        motor.target = 0.45;
+        break;
       case STATE_INACTIVE:
         // TODO reset inizio corsa
         motor.target = 0;
@@ -457,6 +482,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         }
         break;
       case STATE_SPINTA:
+        targetSpinta = brakeVoltage(currentSpeed);
         if (!motor.enabled)
         {
           digitalWrite(ENABLE_PIN, HIGH);
@@ -464,9 +490,19 @@ void Task1(void *pvParameters) // task implementazione funzionalità
           motor.controller = MotionControlType::torque;
         }
 
-        motor.target = brakeVoltage(currentSpeed);
+        if (targetSpinta == 0)
+        {
+          digitalWrite(ENABLE_PIN, LOW);
+        }
+        else
+        {
+          digitalWrite(ENABLE_PIN, HIGH);
+        }
+
+        motor.target = targetSpinta;
         break;
       case STATE_FRENATA:
+        digitalWrite(ENABLE_PIN, HIGH);
         motor.controller = MotionControlType::velocity;
         motor.target = -vmin;
         break;
@@ -543,7 +579,7 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       float tmpvmax = UNDEFINED_VALUE;
       float tmpvmin = UNDEFINED_VALUE;
       float tmpvmaxfrenata = UNDEFINED_VALUE;
-      float tmpvminfrenata= UNDEFINED_VALUE;
+      float tmpvminfrenata = UNDEFINED_VALUE;
       float tmpcfrenata = UNDEFINED_VALUE;
       float tmpvtocco = UNDEFINED_VALUE;
       float tmprampDuration = UNDEFINED_VALUE;
@@ -636,22 +672,22 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         timeoutDuration = tmptimeoutDuration;
       }
 
-      if(tmpvmaxfrenata != UNDEFINED_VALUE)
+      if (tmpvmaxfrenata != UNDEFINED_VALUE)
       {
         vmax_frenata = tmpvmaxfrenata;
       }
 
-      if(tmpvminfrenata != UNDEFINED_VALUE)
+      if (tmpvminfrenata != UNDEFINED_VALUE)
       {
         vmin_frenata = tmpvminfrenata;
       }
 
-      if(tmpcfrenata != UNDEFINED_VALUE)
+      if (tmpcfrenata != UNDEFINED_VALUE)
       {
         c_frenata = tmpcfrenata;
       }
 
-      if(tmpvtocco != UNDEFINED_VALUE)
+      if (tmpvtocco != UNDEFINED_VALUE)
       {
         v_tocco = tmpvtocco;
       }

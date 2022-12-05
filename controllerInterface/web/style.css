@@ -176,3 +176,9 @@
 .input-box input{
     margin-left:0.5em;
 }
+
+.btn{
+    max-width: 20%;
+    margin:1em;
+    padding:0.5em;
+}

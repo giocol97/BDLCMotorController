@@ -3,6 +3,7 @@ console.log("start");
 
 function showData(json) {
     const obj = JSON.parse(json);
+    console.log(json)
 
     $("#time").text(obj.time);
     //$("#angle").text(parseFloat(obj.angle).format(2));
@@ -68,15 +69,40 @@ function sendData() {
     var tend = $("#input-tend").val();
     var tbrake = $("#input-tbrake").val();
     var timeoutDuration = $("#input-timeoutDuration").val();
+    var vmaxfrenata = $("#input-vmaxfrenata").val();
+    var vminfrenata = $("#input-vminfrenata").val();
+    var cfrenata = $("#input-cfrenata").val();
+    var vtocco = $("#input-vtocco").val();
 
-    var txt = "Set;" + vmax + ";" + vmin + ";" + 0 + ";" + pulseStart + ";" + pulseStop + ";" + pulseEnd + ";" + tend + ";" + tbrake + ";" + timeoutDuration;
+    var txt = "Set;" + vmax + ";" + vmin + ";" + 0 + ";" + pulseStart + ";" + pulseStop + ";" + pulseEnd + ";" + tend + ";" + tbrake + ";" + timeoutDuration + ";" + vmaxfrenata + ";" + vminfrenata + ";" + cfrenata + ";" + vtocco;
+
+    $("#output-box").text(txt);
 
     console.log("sendData: " + txt);
 
     sendSetPacket(txt);
 }
 
-function clearlog(){
+function setValues(){
+    //parse txt string and set values to input fields
+    var txt = $("#output-box").val();
+    var values = txt.split(";");
+    $("#input-vmax").val(values[1]);
+    $("#input-vmin").val(values[2]);
+    $("#input-ramp").val(values[3]);
+    $("#input-pulseStart").val(values[4]);
+    $("#input-pulseStop").val(values[5]);
+    $("#input-pulseEnd").val(values[6]);
+    $("#input-tend").val(values[7]);
+    $("#input-tbrake").val(values[8]);
+    $("#input-timeoutDuration").val(values[9]);
+    $("#input-vmaxfrenata").val(values[10]);
+    $("#input-vminfrenata").val(values[11]);
+    $("#input-cfrenata").val(values[12]);
+    $("#input-vtocco").val(values[13]);
+}
+
+function clearlog() {
     $("#logDiv").text("");
 }
 

@@ -79,31 +79,43 @@
         </div>
 
         <!--
-        // web parameters TODO define defaults in header
-float vmax = 200;                         // rad/s
+// web parameters TODO define defaults in header
+float vmax = 100;                         // rad/s
+float vmax_frenata = 400;                 // rad/s
+float vmin_frenata = 200;                 // rad/s
+float c_frenata = 3;                      // V*10
 float vmin = 50;                          // rad/s
+float v_tocco = 25;                       // rad/s
 float rampDuration = UNDEFINED_VALUE;     // ms TODO use
 int pulseStart = RAIL_LENGTH_DEBUG * 0.1; // pulses
 int pulseStop = RAIL_LENGTH_DEBUG * 0.75; // pulses
 int pulseEnd = RAIL_LENGTH_DEBUG * 0.9;   // pulses
 float tend = 0.3;                         // V
-float tbrake = 0.3;
-long timeoutDuration = 5000;
+float tbrake = 0.7;
+long timeoutDuration = 10000;
         
-        sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration);-->
+      sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d;%f;%f;%f;%f", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration, &tmpvmaxfrenata, &tmpvminfrenata, &tmpcfrenata, &tmpvtocco);-->
         <div class="row">
-          <div class="input-box">vmax <input id="input-vmax" value="200" type="text"></div>
+          <div class="input-box">vmax <input id="input-vmax" value="100" type="text"></div>
           <div class="input-box">vmin <input id="input-vmin" value="50" type="text"></div>
-          <div class="input-box">rail length <input id="input-rail" value="1280" type="text"></div>
+          <div class="input-box">rail length <input id="input-rail" value="2190" type="text"></div>
           <div class="input-box">pulse start <input id="input-pulseStart" value="0.1" type="text"></div>
           <div class="input-box">pulse stop <input id="input-pulseStop" value="0.75" type="text"></div>
           <div class="input-box">pulse end <input id="input-pulseEnd" value="0.9" type="text"></div>
           <div class="input-box">torque end <input id="input-tend" value="0.3" type="text"></div>
-          <div class="input-box">torque brake <input id="input-tbrake" value="0.3" type="text"></div>
-          <div class="input-box">timeout duration <input id="input-timeoutDuration" value="5000" type="text"></div>
+          <div class="input-box">torque brake <input id="input-tbrake" value="0.7" type="text"></div>
+          <div class="input-box">timeout duration <input id="input-timeoutDuration" value="10000" type="text"></div>
 
+          <div class="input-box">vmax frenata <input id="input-vmaxfrenata" value="400" type="text"></div>
+          <div class="input-box">vmin frenata <input id="input-vminfrenata" value="200" type="text"></div>
+          <div class="input-box">c frenata <input id="input-cfrenata" value="3" type="text"></div>
+          <div class="input-box">v tocco <input id="input-vtocco" value="25" type="text"></div>
 
-          <button class="btn btn-success" onclick="sendData()">Send</button>
+          <br>
+          <button class="btn btn-success" onclick="sendData()">Send to micro</button>
+
+          <input type="text" id="output-box" value="Set;100;50;1280;0.1;0.75;0.9;0.3;0.7;10000;400;200;3;25">
+          <button class="btn btn-warning" onclick="setValues()">Set form</button>
 
         </div>
         <div class="row">
