@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#define CONFIG_NAMESPACE "config"
 
 #define ENABLE_PIN 21
 #define LOG_RX 15
@@ -60,6 +61,23 @@
 #define STATE_INIZIO_RITORNO 6
 #define STATE_RITORNO_VEL 7
 #define STATE_RITORNO_TOR 8
+
+
+//valori default parametri
+#define DEFAULT_VMAX 100
+#define DEFAULT_VMAX_FRENATA 400
+#define DEFAULT_VMIN_FRENATA 200
+#define DEFAULT_C_FRENATA 3
+#define DEFAULT_VMIN 50
+#define DEFAULT_VTOCCO 25
+#define DEFAULT_RAMP_DURATION UNDEFINED_VALUE
+#define DEFAULT_PULSE_START RAIL_LENGTH_DEBUG * 0.1
+#define DEFAULT_PULSE_STOP RAIL_LENGTH_DEBUG * 0.75
+#define DEFAULT_PULSE_END RAIL_LENGTH_DEBUG * 0.9
+#define DEFAULT_TEND 0.3
+#define DEFAULT_TBRAKE 0.7
+#define DEFAULT_TIMEOUT_DURATION 10000
+
 
 float avgNoZero(float *arr, int size);
 int radiansToImpulses(float rad);

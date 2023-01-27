@@ -1,14 +1,17 @@
+#include "headers.h"
+
 #include <SimpleFOC.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 
-#include "headers.h"
+Preferences preferences;
 
 DynamicJsonDocument data(1024);
 
 HardwareSerial logSerial = Serial1;
 
-//#define COMMANDER_ENABLED
+// #define COMMANDER_ENABLED
 
 // Hall sensor instance
 // HallSensor(int hallA, int hallB , int hallC , int pp)
@@ -105,6 +108,27 @@ void initPins()
   pinMode(PWM_W, OUTPUT);
 }
 
+void initVariables()
+{
+  preferences.begin(CONFIG_NAMESPACE, false);
+
+  vmax = preferences.getFloat("vmax", DEFAULT_VMAX);
+  vmax_frenata = preferences.getFloat("vmax_frenata", DEFAULT_VMAX_FRENATA);
+  vmin_frenata = preferences.getFloat("vmin_frenata", DEFAULT_VMIN_FRENATA);
+  c_frenata = preferences.getFloat("c_frenata", DEFAULT_C_FRENATA);
+  vmin = preferences.getFloat("vmin", DEFAULT_VMIN);
+  v_tocco = preferences.getFloat("v_tocco", DEFAULT_VTOCCO);
+  rampDuration = preferences.getFloat("rampDuration", DEFAULT_RAMP_DURATION);
+  pulseStart = preferences.getInt("pulseStart", DEFAULT_PULSE_START);
+  pulseStop = preferences.getInt("pulseStop", DEFAULT_PULSE_STOP);
+  pulseEnd = preferences.getInt("pulseEnd", DEFAULT_PULSE_END);
+  tend = preferences.getFloat("tend", DEFAULT_TEND);
+  tbrake = preferences.getFloat("tbrake", DEFAULT_TBRAKE);
+  timeoutDuration = preferences.getLong("timeoutDuration", DEFAULT_TIMEOUT_DURATION);
+
+  preferences.end();
+}
+
 void setup()
 {
 
@@ -116,6 +140,8 @@ void setup()
   logSerial.println("Starting new");
 
   // delay(500);
+
+  initVariables();
 
   initPins();
 
@@ -241,7 +267,7 @@ void setup()
 
   // motor.target = (300);
 
-  //#ifndef COMMANDER_ENABLED
+  // #ifndef COMMANDER_ENABLED
   /*xTaskCreatePinnedToCore(
       TaskPrintData,
       "TaskLoop",
@@ -287,7 +313,7 @@ void setup()
       &TaskHandleSerial,
       1);
 
-  //#endif
+  // #endif
 }
 
 void Task0(void *pvParameters) // task raccolta dati/commander
@@ -469,7 +495,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
           motor.controller = MotionControlType::torque;
         }
 
-        //motor.controller = MotionControlType::torque;
+        // motor.controller = MotionControlType::torque;
         motor.target = 0.45;
         break;
       case STATE_INACTIVE:
@@ -627,70 +653,87 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         motor.target = tmpTarget;
       }*/
 
+      preferences.begin(CONFIG_NAMESPACE, false);
+
       if (tmpvmax != UNDEFINED_VALUE)
       {
         vmax = tmpvmax;
+        preferences.putFloat("vmax", vmax);
       }
 
       if (tmpvmin != UNDEFINED_VALUE)
       {
         vmin = tmpvmin;
+        preferences.putFloat("vmin", vmin);
       }
 
       if (tmprampDuration != UNDEFINED_VALUE)
       {
         rampDuration = tmprampDuration;
+        preferences.putFloat("rampDuration", rampDuration);
       }
 
       if (tmppulseStart != UNDEFINED_VALUE)
       {
         pulseStart = tmppulseStart;
+        preferences.putInt("pulseStart", pulseStart);
       }
 
       if (tmppulseStop != UNDEFINED_VALUE)
       {
         pulseStop = tmppulseStop;
+        preferences.putInt("pulseStop", pulseStop);
       }
 
       if (tmppulseEnd != UNDEFINED_VALUE)
       {
         pulseEnd = tmppulseEnd;
+        preferences.putInt("pulseEnd", pulseEnd);
       }
 
       if (tmptend != UNDEFINED_VALUE)
       {
         tend = tmptend;
+        preferences.putFloat("tend", tend);
       }
 
       if (tmptbrake != UNDEFINED_VALUE)
       {
         tbrake = tmptbrake;
+        preferences.putFloat("tbrake", tbrake);
       }
 
       if (tmptimeoutDuration != UNDEFINED_VALUE)
       {
         timeoutDuration = tmptimeoutDuration;
+        preferences.putInt("timeoutDuration", timeoutDuration);
       }
 
       if (tmpvmaxfrenata != UNDEFINED_VALUE)
       {
         vmax_frenata = tmpvmaxfrenata;
+        preferences.putFloat("vmax_frenata", vmax_frenata);
       }
 
       if (tmpvminfrenata != UNDEFINED_VALUE)
       {
         vmin_frenata = tmpvminfrenata;
+        preferences.putFloat("vmin_frenata", vmin_frenata);
       }
 
       if (tmpcfrenata != UNDEFINED_VALUE)
       {
         c_frenata = tmpcfrenata;
+        preferences.putFloat("c_frenata", c_frenata);
       }
 
       if (tmpvtocco != UNDEFINED_VALUE)
       {
         v_tocco = tmpvtocco;
+        preferences.putFloat("v_tocco", v_tocco);
       }
+
+      preferences.end();
 
       logSerial.printf("Set parameters: vmax=%f, vmin=%f, rampDuration=%f, pulseStart=%d, pulseStop=%d, pulseEnd=%d, tend=%f, tbrake=%f, timeoutDuration=%d, vmax_frenata=%f, vmin_frenata=%f, c_frenata=%f, v_tocco=%f\n", vmax, vmin, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration, vmax_frenata, vmin_frenata, c_frenata, v_tocco);
     }
