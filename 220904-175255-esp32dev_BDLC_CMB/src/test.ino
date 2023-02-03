@@ -12,6 +12,7 @@ DynamicJsonDocument data(1024);
 HardwareSerial logSerial = Serial1;
 
 // #define COMMANDER_ENABLED
+//facciamo una modifica per vedere se Gio la vede come me !!!!!!!!!!!!!!!
 
 // Hall sensor instance
 // HallSensor(int hallA, int hallB , int hallC , int pp)
