@@ -1,7 +1,5 @@
 import serial
 import json
-import matplotlib.pyplot as plt
-import numpy as np
 import eel
 
 
@@ -23,7 +21,7 @@ def send_set_packet(txt):
 
 def serial_thread():
     global ser
-    ser = serial.Serial('COM18', 115200, timeout=1)
+    ser = serial.Serial('COM3', 115200, timeout=1)
 
     while True:
         eel.sleep(0.001)

@@ -32,7 +32,7 @@ BLDCMotor motor = BLDCMotor(POLE_PAIRS, PHASE_RESISTANCE, KV_RATING); //, 220); 
 void doMotor(char *cmd) { command.motor(&motor, cmd); }*/
 
 //  LowsideCurrentSense(float shunt_resistor, float gain, int pinA, int pinB, int pinC = _NC);
-LowsideCurrentSense current_sense = LowsideCurrentSense(SHUNT_RESISTOR, CURRENT_SENSING_GAIN, I_U, I_V, I_W);
+//LowsideCurrentSense current_sense = LowsideCurrentSense(SHUNT_RESISTOR, CURRENT_SENSING_GAIN, I_U, I_V, I_W);
 
 TaskHandle_t TaskHandleSpeed;
 TaskHandle_t TaskHandleData;
@@ -165,8 +165,8 @@ void setup()
   // driver init
   driver.init();
   logSerial.println("Driver OK");
-
-  current_sense.linkDriver(&driver);
+  
+  //current_sense.linkDriver(&driver);
 
   motor.voltage_sensor_align = 1.5;
 
@@ -227,7 +227,7 @@ void setup()
   // print current sense pins
   // logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
 
-  // init current sense
+  /*// init current sense TODO disattivato
   if (current_sense.init())
     logSerial.println("Current sense init success!");
   else
@@ -237,13 +237,13 @@ void setup()
   }
 
   // link the motor to current sense
-  motor.linkCurrentSense(&current_sense);
+  motor.linkCurrentSense(&current_sense);*/
 
   /*current_sense.gain_a = -5.0f;
   current_sense.gain_b = -5.0f;
   current_sense.gain_c = -5.0f;*/
 
-  current_sense.skip_align = true;
+  //current_sense.skip_align = true;
 
   logSerial.println("Motor pre FOC OK");
 
@@ -264,7 +264,6 @@ void setup()
 
   currentSystemState = STATE_START;
   endSetupMillis = millis();
-
   // motor.target = (300);
 
   // #ifndef COMMANDER_ENABLED
@@ -653,93 +652,119 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         motor.target = tmpTarget;
       }*/
 
-      preferences.begin(CONFIG_NAMESPACE, false);
+      // preferences.begin(CONFIG_NAMESPACE, false);
 
       if (tmpvmax != UNDEFINED_VALUE)
       {
         vmax = tmpvmax;
-        preferences.putFloat("vmax", vmax);
+        // preferences.putFloat("vmax", vmax);
       }
 
       if (tmpvmin != UNDEFINED_VALUE)
       {
         vmin = tmpvmin;
-        preferences.putFloat("vmin", vmin);
+        // preferences.putFloat("vmin", vmin);
       }
 
       if (tmprampDuration != UNDEFINED_VALUE)
       {
         rampDuration = tmprampDuration;
-        preferences.putFloat("rampDuration", rampDuration);
+        // preferences.putFloat("rampDuration", rampDuration);
       }
 
       if (tmppulseStart != UNDEFINED_VALUE)
       {
         pulseStart = tmppulseStart;
-        preferences.putInt("pulseStart", pulseStart);
+        // preferences.putInt("pulseStart", pulseStart);
       }
 
       if (tmppulseStop != UNDEFINED_VALUE)
       {
         pulseStop = tmppulseStop;
-        preferences.putInt("pulseStop", pulseStop);
+        // preferences.putInt("pulseStop", pulseStop);
       }
 
       if (tmppulseEnd != UNDEFINED_VALUE)
       {
         pulseEnd = tmppulseEnd;
-        preferences.putInt("pulseEnd", pulseEnd);
+        // preferences.putInt("pulseEnd", pulseEnd);
       }
 
       if (tmptend != UNDEFINED_VALUE)
       {
         tend = tmptend;
-        preferences.putFloat("tend", tend);
+        // preferences.putFloat("tend", tend);
       }
 
       if (tmptbrake != UNDEFINED_VALUE)
       {
         tbrake = tmptbrake;
-        preferences.putFloat("tbrake", tbrake);
+        // preferences.putFloat("tbrake", tbrake);
       }
 
       if (tmptimeoutDuration != UNDEFINED_VALUE)
       {
         timeoutDuration = tmptimeoutDuration;
-        preferences.putInt("timeoutDuration", timeoutDuration);
+        // preferences.putLong("timeoutDuration", timeoutDuration);
       }
 
       if (tmpvmaxfrenata != UNDEFINED_VALUE)
       {
         vmax_frenata = tmpvmaxfrenata;
-        preferences.putFloat("vmax_frenata", vmax_frenata);
+        // preferences.putFloat("vmax_frenata", vmax_frenata);
       }
 
       if (tmpvminfrenata != UNDEFINED_VALUE)
       {
         vmin_frenata = tmpvminfrenata;
-        preferences.putFloat("vmin_frenata", vmin_frenata);
+        // preferences.putFloat("vmin_frenata", vmin_frenata);
       }
 
       if (tmpcfrenata != UNDEFINED_VALUE)
       {
         c_frenata = tmpcfrenata;
-        preferences.putFloat("c_frenata", c_frenata);
+        // preferences.putFloat("c_frenata", c_frenata);
       }
 
       if (tmpvtocco != UNDEFINED_VALUE)
       {
         v_tocco = tmpvtocco;
-        preferences.putFloat("v_tocco", v_tocco);
+        // preferences.putFloat("v_tocco", v_tocco);
       }
 
-      preferences.end();
+      // preferences.end();
 
       logSerial.printf("Set parameters: vmax=%f, vmin=%f, rampDuration=%f, pulseStart=%d, pulseStop=%d, pulseEnd=%d, tend=%f, tbrake=%f, timeoutDuration=%d, vmax_frenata=%f, vmin_frenata=%f, c_frenata=%f, v_tocco=%f\n", vmax, vmin, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration, vmax_frenata, vmin_frenata, c_frenata, v_tocco);
+
+      saveCurrentPreferences();
     }
 
     delay(10);
   }
+}
+
+void saveCurrentPreferences()
+{
+
+  preferences.begin(CONFIG_NAMESPACE, false);
+  Serial.println("Opened preferences");
+  preferences.putFloat("vmax", vmax);
+  Serial.println("Saved vmax");
+  preferences.putFloat("vmin", vmin);
+  preferences.putFloat("rampDuration", rampDuration);
+  preferences.putInt("pulseStart", pulseStart);
+  preferences.putInt("pulseStop", pulseStop);
+  preferences.putInt("pulseEnd", pulseEnd);
+  preferences.putFloat("tend", tend);
+  preferences.putFloat("tbrake", tbrake);
+  preferences.putLong("timeoutDuration", timeoutDuration);
+  preferences.putFloat("vmax_frenata", vmax_frenata);
+  preferences.putFloat("vmin_frenata", vmin_frenata);
+  preferences.putFloat("c_frenata", c_frenata);
+  preferences.putFloat("v_tocco", v_tocco);
+  preferences.end();
+
+  Serial.println("Preferences saved");
 }
 
 void loop()
