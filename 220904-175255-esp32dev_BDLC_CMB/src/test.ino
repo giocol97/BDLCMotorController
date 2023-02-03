@@ -12,7 +12,6 @@ DynamicJsonDocument data(1024);
 HardwareSerial logSerial = Serial1;
 
 // #define COMMANDER_ENABLED
-//facciamo una modifica per vedere se Gio la vede come me !!!!!!!!!!!!!!!
 
 // Hall sensor instance
 // HallSensor(int hallA, int hallB , int hallC , int pp)
@@ -33,7 +32,7 @@ BLDCMotor motor = BLDCMotor(POLE_PAIRS, PHASE_RESISTANCE, KV_RATING); //, 220); 
 void doMotor(char *cmd) { command.motor(&motor, cmd); }*/
 
 //  LowsideCurrentSense(float shunt_resistor, float gain, int pinA, int pinB, int pinC = _NC);
-//LowsideCurrentSense current_sense = LowsideCurrentSense(SHUNT_RESISTOR, CURRENT_SENSING_GAIN, I_U, I_V, I_W);
+// LowsideCurrentSense current_sense = LowsideCurrentSense(SHUNT_RESISTOR, CURRENT_SENSING_GAIN, I_U, I_V, I_W);
 
 TaskHandle_t TaskHandleSpeed;
 TaskHandle_t TaskHandleData;
@@ -166,8 +165,8 @@ void setup()
   // driver init
   driver.init();
   logSerial.println("Driver OK");
-  
-  //current_sense.linkDriver(&driver);
+
+  // current_sense.linkDriver(&driver);
 
   motor.voltage_sensor_align = 1.5;
 
@@ -244,7 +243,7 @@ void setup()
   current_sense.gain_b = -5.0f;
   current_sense.gain_c = -5.0f;*/
 
-  //current_sense.skip_align = true;
+  // current_sense.skip_align = true;
 
   logSerial.println("Motor pre FOC OK");
 
@@ -645,7 +644,7 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         continue;
       }
 
-      sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d;%f;%f;%f;%f", /*&tmpTarget,*/ &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration, &tmpvmaxfrenata, &tmpvminfrenata, &tmpcfrenata, &tmpvtocco);
+      sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d;%f;%f;%f;%f", &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration, &tmpvmaxfrenata, &tmpvminfrenata, &tmpcfrenata, &tmpvtocco);
 
       // TODO check input
       /*if (tmpTarget != UNDEFINED_VALUE)
@@ -653,87 +652,70 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         motor.target = tmpTarget;
       }*/
 
-      // preferences.begin(CONFIG_NAMESPACE, false);
-
       if (tmpvmax != UNDEFINED_VALUE)
       {
         vmax = tmpvmax;
-        // preferences.putFloat("vmax", vmax);
       }
 
       if (tmpvmin != UNDEFINED_VALUE)
       {
         vmin = tmpvmin;
-        // preferences.putFloat("vmin", vmin);
       }
 
       if (tmprampDuration != UNDEFINED_VALUE)
       {
         rampDuration = tmprampDuration;
-        // preferences.putFloat("rampDuration", rampDuration);
       }
 
       if (tmppulseStart != UNDEFINED_VALUE)
       {
         pulseStart = tmppulseStart;
-        // preferences.putInt("pulseStart", pulseStart);
       }
 
       if (tmppulseStop != UNDEFINED_VALUE)
       {
         pulseStop = tmppulseStop;
-        // preferences.putInt("pulseStop", pulseStop);
       }
 
       if (tmppulseEnd != UNDEFINED_VALUE)
       {
         pulseEnd = tmppulseEnd;
-        // preferences.putInt("pulseEnd", pulseEnd);
       }
 
       if (tmptend != UNDEFINED_VALUE)
       {
         tend = tmptend;
-        // preferences.putFloat("tend", tend);
       }
 
       if (tmptbrake != UNDEFINED_VALUE)
       {
         tbrake = tmptbrake;
-        // preferences.putFloat("tbrake", tbrake);
       }
 
       if (tmptimeoutDuration != UNDEFINED_VALUE)
       {
         timeoutDuration = tmptimeoutDuration;
-        // preferences.putLong("timeoutDuration", timeoutDuration);
       }
 
       if (tmpvmaxfrenata != UNDEFINED_VALUE)
       {
         vmax_frenata = tmpvmaxfrenata;
-        // preferences.putFloat("vmax_frenata", vmax_frenata);
       }
 
       if (tmpvminfrenata != UNDEFINED_VALUE)
       {
         vmin_frenata = tmpvminfrenata;
-        // preferences.putFloat("vmin_frenata", vmin_frenata);
       }
 
       if (tmpcfrenata != UNDEFINED_VALUE)
       {
         c_frenata = tmpcfrenata;
-        // preferences.putFloat("c_frenata", c_frenata);
       }
 
       if (tmpvtocco != UNDEFINED_VALUE)
       {
         v_tocco = tmpvtocco;
-        // preferences.putFloat("v_tocco", v_tocco);
       }
-
-      // preferences.end();
 
       logSerial.printf("Set parameters: vmax=%f, vmin=%f, rampDuration=%f, pulseStart=%d, pulseStop=%d, pulseEnd=%d, tend=%f, tbrake=%f, timeoutDuration=%d, vmax_frenata=%f, vmin_frenata=%f, c_frenata=%f, v_tocco=%f\n", vmax, vmin, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration, vmax_frenata, vmin_frenata, c_frenata, v_tocco);
 
@@ -746,11 +728,10 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
 
 void saveCurrentPreferences()
 {
+  Serial.println("Opening preferences");
 
   preferences.begin(CONFIG_NAMESPACE, false);
-  Serial.println("Opened preferences");
   preferences.putFloat("vmax", vmax);
-  Serial.println("Saved vmax");
   preferences.putFloat("vmin", vmin);
   preferences.putFloat("rampDuration", rampDuration);
   preferences.putInt("pulseStart", pulseStart);

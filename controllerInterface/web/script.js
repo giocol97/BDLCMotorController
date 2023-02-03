@@ -3,7 +3,7 @@ console.log("start");
 
 function showData(json) {
     const obj = JSON.parse(json);
-    console.log(json)
+    //console.log(json)
 
     $("#time").text(obj.time);
     //$("#angle").text(parseFloat(obj.angle).format(2));
@@ -50,22 +50,17 @@ function showData(json) {
     $("#state").text(state);
 }
 
+//sscanf(command.c_str(), "Set;%f;%f;%f;%d;%d;%d;%f;%f;%d;%f;%f;%f;%f", &tmpvmax, &tmpvmin, &tmprampDuration, &tmppulseStart, &tmppulseStop, &tmppulseEnd, &tmptend, &tmptbrake, &tmptimeoutDuration, &tmpvmaxfrenata, &tmpvminfrenata, &tmpcfrenata, &tmpvtocco);
+
 function sendData() {
+    var railLength = $("#input-rail").val();
+
     var vmax = $("#input-vmax").val();
     var vmin = $("#input-vmin").val();
     //var ramp = $("#input-ramp").val();
-
-    var railLength = $("#input-rail").val();
-
     var pulseStart = railLength * $("#input-pulseStart").val();
     var pulseStop = railLength * $("#input-pulseStop").val();
     var pulseEnd = railLength * $("#input-pulseEnd").val();
-    /* $("#input-pulseStart").val(pulseStart);
-     $("#input-pulseStop").val(pulseStop);
-     $("#input-pulseEnd").val(pulseEnd);*/
-    /*var pulseStart = $("#input-pulseStart").val();
-    var pulseStop = $("#input-pulseStop").val();
-    var pulseEnd = $("#input-pulseEnd").val();*/
     var tend = $("#input-tend").val();
     var tbrake = $("#input-tbrake").val();
     var timeoutDuration = $("#input-timeoutDuration").val();
@@ -76,23 +71,25 @@ function sendData() {
 
     var txt = "Set;" + vmax + ";" + vmin + ";" + 0 + ";" + pulseStart + ";" + pulseStop + ";" + pulseEnd + ";" + tend + ";" + tbrake + ";" + timeoutDuration + ";" + vmaxfrenata + ";" + vminfrenata + ";" + cfrenata + ";" + vtocco;
 
-    $("#output-box").text(txt);
+    $("#output-box").val(txt);
 
     console.log("sendData: " + txt);
 
     sendSetPacket(txt);
 }
 
-function setValues(){
+function setValues() {
+    var railLength = $("#input-rail").val();
+
     //parse txt string and set values to input fields
     var txt = $("#output-box").val();
     var values = txt.split(";");
     $("#input-vmax").val(values[1]);
     $("#input-vmin").val(values[2]);
     $("#input-ramp").val(values[3]);
-    $("#input-pulseStart").val(values[4]);
-    $("#input-pulseStop").val(values[5]);
-    $("#input-pulseEnd").val(values[6]);
+    $("#input-pulseStart").val((values[4] / railLength).toFixed(2));
+    $("#input-pulseStop").val((values[5] / railLength).toFixed(2));
+    $("#input-pulseEnd").val((values[6] / railLength).toFixed(2));
     $("#input-tend").val(values[7]);
     $("#input-tbrake").val(values[8]);
     $("#input-timeoutDuration").val(values[9]);
