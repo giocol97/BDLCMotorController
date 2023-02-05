@@ -2,12 +2,21 @@
 
 #include <SimpleFOC.h>
 #include <WiFi.h>
-#include <ArduinoJson.h>
+// #include <ArduinoJson.h>
 #include <Preferences.h>
 
 Preferences preferences;
 
-DynamicJsonDocument data(1024);
+// DynamicJsonDocument data(1024);
+
+// valori JSON
+long logTime = 0;
+int logPulses = 0;
+float logSpeed = 0;
+float logVoltage = 0;
+float logTarget = 0;
+int logControl = 0;
+int logState = 0;
 
 HardwareSerial logSerial = Serial1;
 
@@ -36,6 +45,7 @@ void doMotor(char *cmd) { command.motor(&motor, cmd); }*/
 
 TaskHandle_t TaskHandleSpeed;
 TaskHandle_t TaskHandleData;
+TaskHandle_t TaskHandleWatchdog;
 
 TaskHandle_t TaskHandle0;
 TaskHandle_t TaskHandle1;
@@ -135,6 +145,8 @@ void setup()
   WiFi.mode(WIFI_OFF);
 
   Serial.begin(LOG_BAUD);
+
+  ledInit();
 
   logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
@@ -310,6 +322,15 @@ void setup()
       NULL,
       9,
       &TaskHandleSerial,
+      1);
+
+  xTaskCreatePinnedToCore(
+      TaskWatchdog,
+      "TaskControl",
+      5000,
+      NULL,
+      14,
+      &TaskHandleWatchdog,
       1);
 
   // #endif
@@ -573,15 +594,41 @@ void Task1(void *pvParameters) // task implementazione funzionalità
       }
     }
 
-    data["time"] = millis();
-    // data["angle"] = currentAngle;
-    data["pulses"] = pulses;
-    data["speed"] = currentSpeed;
-    data["voltage"] = 0.0f;
-    data["target"] = motor.target;
-    data["control"] = motor.controller;
-    data["state"] = currentSystemState;
+    /* data["time"] = millis();
+     // data["angle"] = currentAngle;
+     data["pulses"] = pulses;
+     data["speed"] = currentSpeed;
+     data["voltage"] = 0.0f;
+     data["target"] = motor.target;
+     data["control"] = motor.controller;
+     data["state"] = currentSystemState;*/
+
+    logTime = millis();
+    logPulses = pulses;
+    logSpeed = currentSpeed;
+    logVoltage = 0.0f;
+    logTarget = motor.target;
+    logControl = motor.controller;
+    logState = currentSystemState;
     // serializeJson(data, logSerial); su altro task
+  }
+}
+
+bool ledOn = false;
+
+int lastUpdatedSerialTask = 0;
+
+void TaskWatchdog(void *pvParameters) // task watchdog
+{
+  while (1)
+  {
+    delay(100);
+
+    if (millis() - lastUpdatedSerialTask > 500)
+    {
+      Serial.println("Watchdog: Serial task not responding");
+      ledBlue();
+    }
   }
 }
 
@@ -591,11 +638,46 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
   int lastSent = 0;
   while (1)
   {
+
+    lastUpdatedSerialTask = millis();
+
     if (millis() - lastSent > 100)
     {
-      serializeJson(data, logSerial);
-      logSerial.println();
       lastSent = millis();
+
+      //{"time":6146,"pulses":-1467,"speed":-185.3429108,"voltage":0,"target":0.449999988,"control":0,"state":0}
+
+      // serializeJson(data, logSerial);
+
+      logSerial.print("{\"time\":");
+      logSerial.print(logTime);
+      logSerial.print(",\"pulses\":");
+      logSerial.print(logPulses);
+      logSerial.print(",\"speed\":");
+      logSerial.print(logSpeed);
+      logSerial.print(",\"voltage\":");
+      logSerial.print(logVoltage);
+      logSerial.print(",\"target\":");
+      logSerial.print(logTarget);
+      logSerial.print(",\"control\":");
+      logSerial.print(logControl);
+      logSerial.print(",\"state\":");
+      logSerial.print(logState);
+      logSerial.print("}");
+      logSerial.println();
+
+      Serial.println(millis());
+
+      if (ledOn)
+      {
+        ledRed();
+      }
+      else
+      {
+        ledGreen();
+      }
+
+      ledOn = !ledOn;
     }
 
     if (logSerial.available())
