@@ -666,7 +666,7 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       logSerial.print("}");
       logSerial.println();
 
-      Serial.println(millis());
+      //Serial.println(millis());
 
       if (ledOn)
       {
