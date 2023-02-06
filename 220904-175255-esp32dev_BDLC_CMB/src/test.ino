@@ -302,7 +302,7 @@ void setup()
       "Task1",
       5000,
       NULL,
-      0,
+      15,
       &TaskHandle1,
       1);
 
@@ -311,18 +311,18 @@ void setup()
       "Task0",
       5000,
       NULL,
-      2,
+      10,
       &TaskHandle0,
-      0); 
-        
+      0);
+
   xTaskCreatePinnedToCore(
       TaskWatchdog,
       "TaskControl",
       5000,
       NULL,
-      1,
+      20,
       &TaskHandleWatchdog,
-      0); 
+      0);
 
   xTaskCreatePinnedToCore(
       TaskSerial,
@@ -682,7 +682,7 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       Serial.print("}");
       Serial.println();
 
-      //Serial.println(millis());
+      // Serial.println(millis());
 
       if (ledOn)
       {
