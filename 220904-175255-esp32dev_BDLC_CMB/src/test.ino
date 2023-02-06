@@ -147,6 +147,7 @@ void setup()
   Serial.begin(LOG_BAUD);
 
   ledInit();
+  ledMagenta();
 
   logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
@@ -296,43 +297,41 @@ void setup()
       5,
       &TaskHandleSpeed,
       1);*/
+  xTaskCreatePinnedToCore(
+      Task1,
+      "Task1",
+      5000,
+      NULL,
+      0,
+      &TaskHandle1,
+      1);
 
   xTaskCreatePinnedToCore(
       Task0,
       "Task0",
       5000,
       NULL,
-      5,
+      2,
       &TaskHandle0,
-      0);
-
+      0); 
+        
   xTaskCreatePinnedToCore(
-      Task1,
-      "Task1",
+      TaskWatchdog,
+      "TaskControl",
       5000,
       NULL,
-      10,
-      &TaskHandle1,
-      1);
+      1,
+      &TaskHandleWatchdog,
+      0); 
 
   xTaskCreatePinnedToCore(
       TaskSerial,
       "Taskserial",
       5000,
       NULL,
-      9,
+      5,
       &TaskHandleSerial,
-      1);
-
-  xTaskCreatePinnedToCore(
-      TaskWatchdog,
-      "TaskControl",
-      5000,
-      NULL,
-      14,
-      &TaskHandleWatchdog,
-      1);
-
+      0);
   // #endif
 }
 
@@ -665,6 +664,23 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       logSerial.print(logState);
       logSerial.print("}");
       logSerial.println();
+
+      Serial.print("{\"time\":");
+      Serial.print(logTime);
+      Serial.print(",\"pulses\":");
+      Serial.print(logPulses);
+      Serial.print(",\"speed\":");
+      Serial.print(logSpeed);
+      Serial.print(",\"voltage\":");
+      Serial.print(logVoltage);
+      Serial.print(",\"target\":");
+      Serial.print(logTarget);
+      Serial.print(",\"control\":");
+      Serial.print(logControl);
+      Serial.print(",\"state\":");
+      Serial.print(logState);
+      Serial.print("}");
+      Serial.println();
 
       //Serial.println(millis());
 
