@@ -662,6 +662,8 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       logSerial.print(logControl);
       logSerial.print(",\"state\":");
       logSerial.print(logState);
+      logSerial.print(",\"enabled\":");
+      logSerial.print(motor.enabled);
       logSerial.print("}");
       logSerial.println();
 
@@ -679,6 +681,8 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       Serial.print(logControl);
       Serial.print(",\"state\":");
       Serial.print(logState);
+      Serial.print(",\"enabled\":");
+      Serial.print(motor.enabled);
       Serial.print("}");
       Serial.println();
 
