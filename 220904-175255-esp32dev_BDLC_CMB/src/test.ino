@@ -99,12 +99,11 @@ void initPins()
   pinMode(ENABLE_PIN, OUTPUT);
   digitalWrite(ENABLE_PIN, HIGH);
 
-  pinMode(22, OUTPUT);
-  digitalWrite(22, HIGH);
+  pinMode(ENABLE_BAT, OUTPUT);
+  digitalWrite(ENABLE_BAT, HIGH);
 
-  pinMode(I_U, INPUT);
-  pinMode(I_V, INPUT);
-  pinMode(I_W, INPUT);
+  /*pinMode(26, OUTPUT);
+  digitalWrite(26, HIGH);*/
 
   analogReadResolution(10);
   analogSetAttenuation(ADC_0db);
@@ -507,11 +506,11 @@ void Task1(void *pvParameters) // task implementazione funzionalità
       switch (currentSystemState)
       {
       case STATE_START:
+        motor.controller = MotionControlType::torque;
         if (!motor.enabled)
         {
           digitalWrite(ENABLE_PIN, HIGH);
           motor.enable();
-          motor.controller = MotionControlType::torque;
         }
 
         // motor.controller = MotionControlType::torque;
@@ -528,11 +527,11 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         break;
       case STATE_SPINTA:
         targetSpinta = brakeVoltage(currentSpeed);
+        motor.controller = MotionControlType::torque;
         if (!motor.enabled)
         {
           digitalWrite(ENABLE_PIN, HIGH);
           motor.enable();
-          motor.controller = MotionControlType::torque;
         }
 
         if (targetSpinta == 0)
@@ -571,13 +570,12 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         }
         break;
       case STATE_INIZIO_RITORNO:
+        motor.controller = MotionControlType::torque;
         if (!motor.enabled)
         {
           digitalWrite(ENABLE_PIN, HIGH);
           motor.enable();
         }
-
-        motor.controller = MotionControlType::torque;
 
         motor.target += 0.05;
 
@@ -666,25 +664,6 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       logSerial.print(motor.enabled);
       logSerial.print("}");
       logSerial.println();
-
-      Serial.print("{\"time\":");
-      Serial.print(logTime);
-      Serial.print(",\"pulses\":");
-      Serial.print(logPulses);
-      Serial.print(",\"speed\":");
-      Serial.print(logSpeed);
-      Serial.print(",\"voltage\":");
-      Serial.print(logVoltage);
-      Serial.print(",\"target\":");
-      Serial.print(logTarget);
-      Serial.print(",\"control\":");
-      Serial.print(logControl);
-      Serial.print(",\"state\":");
-      Serial.print(logState);
-      Serial.print(",\"enabled\":");
-      Serial.print(motor.enabled);
-      Serial.print("}");
-      Serial.println();
 
       // Serial.println(millis());
 

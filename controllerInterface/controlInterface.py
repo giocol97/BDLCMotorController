@@ -21,7 +21,7 @@ def send_set_packet(txt):
 
 def serial_thread():
     global ser
-    ser = serial.Serial('COM5', 115200, timeout=1)
+    ser = serial.Serial('COM16', 115200, timeout=1)
 
     while True:
         eel.sleep(0.001)

@@ -4,7 +4,9 @@
 
 #define CONFIG_NAMESPACE "config"
 
-#define ENABLE_PIN 21
+#define ENABLE_BAT 22
+
+#define ENABLE_PIN 26
 #define LOG_RX 15
 #define LOG_TX 4
 #define LOG_BAUD 115200
@@ -20,19 +22,22 @@
 #define KV_RATING 383         // 3660 //[rad/s/volt]  = 383 [rpm/volt]
 
 // PWM
-#define PWM_FREQUENCY 20000
+#define PWM_FREQUENCY 25000
 
 #define PWM_U 27
 #define PWM_V 14
 #define PWM_W 12
 
+//quando freno è da abbassare TODO
+#define IN_2 26
+
 // Current sensing
 #define SHUNT_RESISTOR 0.003
 #define CURRENT_SENSING_GAIN 10
 
-#define I_U 32
+/*#define I_U 32
 #define I_V 25
-#define I_W 33
+#define I_W 33*/
 
 // per funzionalità
 // costanti di controllo
