@@ -2,7 +2,6 @@
 
 #include <SimpleFOC.h>
 #include <WiFi.h>
-// #include <ArduinoJson.h>
 #include <Preferences.h>
 
 Preferences preferences;
@@ -18,7 +17,7 @@ float logTarget = 0;
 int logControl = 0;
 int logState = 0;
 
-HardwareSerial logSerial = Serial1;
+HardwareSerial logSerial = Serial;
 
 // #define COMMANDER_ENABLED
 
@@ -140,15 +139,15 @@ void initVariables()
 
 void setup()
 {
-
   WiFi.mode(WIFI_OFF);
 
   Serial.begin(LOG_BAUD);
+  logSerial.begin(LOG_BAUD);
 
   ledInit();
   ledMagenta();
 
-  logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
+  // logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
 
   // delay(500);
@@ -367,9 +366,14 @@ float c_frenata = 3;                      // V*10
 float vmin = 50;                          // rad/s
 */
 
+float floatMap(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 float brakeVoltage(float speed)
 {
-  return map(speed, vmin_frenata, vmax_frenata, 0, c_frenata) / 10;
+  return floatMap(speed, vmin_frenata, vmax_frenata, 0, c_frenata) / 10;
 }
 
 bool updateState(int pulses, float speed, int millis)
@@ -381,34 +385,52 @@ bool updateState(int pulses, float speed, int millis)
     {
       sensor.electric_rotations = 0;
       currentSystemState = STATE_INACTIVE;
+
+      // print condition for state update
+      logSerial.printf("STATE_START -> STATE_INACTIVE millis(%d) - endSetupMillis(%d) > 2000 && speed(%.2f) == 0\n", millis, endSetupMillis, speed);
     }
     break;
   case STATE_INACTIVE:
     if (pulses > pulseStart && speed > vmax)
     {
       currentSystemState = STATE_SPINTA;
+
+      // print condition for state update
+      logSerial.printf("STATE_INACTIVE -> STATE_SPINTA pulses(%d) > pulseStart(%d) && speed(%.2f) > vmax(%.2f)\n", pulses, pulseStart, speed, vmax);
     }
     else if (pulses > pulseEnd && speed < vmin)
     {
       currentSystemState = STATE_FINECORSA;
+
+      // print condition for state update
+      logSerial.printf("STATE_INACTIVE -> STATE_FINECORSA pulses(%d) > pulseEnd(%d) && speed(%.2f) < vmin(%.2f)\n", pulses, pulseEnd, speed, vmin);
     }
     break;
   case STATE_SPINTA:
     if (pulses > pulseStop || speed < vmin)
     {
       currentSystemState = STATE_FRENATA;
+
+      // print condition for state update
+      logSerial.printf("STATE_SPINTA -> STATE_FRENATA pulses(%d) > pulseStop(%d) || speed(%.2f) < vmin(%.2f)\n", pulses, pulseStop, speed, vmin);
     }
     break;
   case STATE_FRENATA:
     if (pulses > pulseEnd)
     {
       currentSystemState = STATE_QUASIFINECORSA;
+
+      // print condition for state update
+      logSerial.printf("STATE_FRENATA -> STATE_QUASIFINECORSA pulses(%d) > pulseEnd(%d)\n", pulses, pulseEnd);
     }
     break;
   case STATE_QUASIFINECORSA:
     if (speed == 0)
     { // TODO mettere speed "circa" 0?
       currentSystemState = STATE_FINECORSA;
+
+      // print condition for state update
+      logSerial.printf("STATE_QUASIFINECORSA -> STATE_FINECORSA speed(%.2f) == 0\n", speed);
     }
     break;
   case STATE_FINECORSA:
@@ -416,18 +438,27 @@ bool updateState(int pulses, float speed, int millis)
     {
       timeoutStart = 0;
       currentSystemState = STATE_INIZIO_RITORNO;
+
+      // print condition for state update
+      logSerial.printf("STATE_FINECORSA -> STATE_INIZIO_RITORNO millis(%d) - timeoutStart(%d) > timeoutDuration(%d) || speed(%.2f) < -v_tocco(%.2f)\n", millis, timeoutStart, timeoutDuration, speed, -v_tocco);
     }
     break;
   case STATE_INIZIO_RITORNO:
     if (speed < -vmin - 10 /*|| pulses > pulseEnd*/)
     {
       currentSystemState = STATE_RITORNO_VEL;
+
+      // print condition for state update
+      logSerial.printf("STATE_INIZIO_RITORNO -> STATE_RITORNO_VEL speed(%.2f) < -vmin(%.2f) - 10\n", speed, -vmin);
     }
     break;
   case STATE_RITORNO_VEL:
     if (pulses < pulseStart)
     {
       currentSystemState = STATE_RITORNO_TOR;
+
+      // print condition for state update
+      logSerial.printf("STATE_RITORNO_VEL -> STATE_RITORNO_TOR pulses(%d) < pulseStart(%d)\n", pulses, pulseStart);
     }
     break;
   case STATE_RITORNO_TOR:
@@ -435,6 +466,9 @@ bool updateState(int pulses, float speed, int millis)
     {
       sensor.electric_rotations = 0;
       currentSystemState = STATE_INACTIVE;
+
+      // print condition for state update
+      logSerial.printf("STATE_RITORNO_TOR -> STATE_INACTIVE speed(%.2f) == 0\n", speed);
     }
     break;
   }
@@ -662,6 +696,8 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       logSerial.print(logState);
       logSerial.print(",\"enabled\":");
       logSerial.print(motor.enabled);
+      logSerial.print(",\"phases(u_v_w)\":");
+      logSerial.printf("%.2f_%.2f_%.2f", motor.Ua, motor.Ub, motor.Uc);
       logSerial.print("}");
       logSerial.println();
 
@@ -832,12 +868,9 @@ void saveCurrentPreferences()
 
 void loop()
 {
+  // main FOC algorithm function
   motor.loopFOC();
+
+  // Motion control function
   motor.move();
-  // FOC algorithm function
-
-  // motor.move();
-
-  // currentAngle = sensor.getAngle();
-  // currentSpeed = sensor.getVelocity();
 }
