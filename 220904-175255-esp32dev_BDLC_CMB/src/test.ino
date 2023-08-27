@@ -667,12 +667,14 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
 {
 
   int lastSent = 0;
+  bool sendDataEnabled = false;
+
   while (1)
   {
 
     lastUpdatedSerialTask = millis();
 
-    if (millis() - lastSent > 100)
+    if (millis() - lastSent > 100 && sendDataEnabled)
     {
       lastSent = millis();
 
@@ -741,6 +743,24 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
         logSerial.println("Stop command received");
       }
 
+      if (command.indexOf("TYPE") >= 0)
+      {
+        logSerial.println("{\"TYPE\":\"SALICE\"}");
+        continue;
+      }
+
+      if (command.indexOf("sendData0") >= 0)
+      {
+        sendDataEnabled = false;
+        logSerial.println("sendData Off");
+      }
+
+      if (command.indexOf("sendData1") >= 0)
+      {
+        sendDataEnabled = true;
+        logSerial.println("sendData On");
+      }
+
       // check if string contains restart
       if (command.indexOf("enable") >= 0)
       {
@@ -751,6 +771,12 @@ void TaskSerial(void *pvParameters) // task comunicazione con seriale
       if (command.indexOf("reset") >= 0)
       {
         ESP.restart();
+      }
+
+      if (command.indexOf("Get;") >= 0)
+      {        
+        logSerial.printf("Get;%f;%f;%f;%d;%d;%d;%f;%f;%d;%f;%f;%f;%f;\n", vmax, vmin, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration, vmax_frenata, vmin_frenata, c_frenata, v_tocco); 
+        continue;
       }
 
       logSerial.println("Command received: " + command);
