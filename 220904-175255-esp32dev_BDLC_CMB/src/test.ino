@@ -17,7 +17,7 @@ float logTarget = 0;
 int logControl = 0;
 int logState = 0;
 
-HardwareSerial logSerial = Serial;
+HardwareSerial logSerial = Serial1;
 
 // #define COMMANDER_ENABLED
 
@@ -142,12 +142,12 @@ void setup()
   WiFi.mode(WIFI_OFF);
 
   Serial.begin(LOG_BAUD);
-  logSerial.begin(LOG_BAUD);
+  //logSerial.begin(LOG_BAUD);
 
   ledInit();
   ledMagenta();
 
-  // logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
+  logSerial.begin(LOG_BAUD, SERIAL_8N1, LOG_RX, LOG_TX);
   logSerial.println("Starting new");
 
   // delay(500);
