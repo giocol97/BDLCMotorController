@@ -46,8 +46,8 @@ TaskHandle_t TaskHandleSpeed;
 TaskHandle_t TaskHandleData;
 TaskHandle_t TaskHandleWatchdog;
 
-TaskHandle_t TaskHandle0;
-TaskHandle_t TaskHandle1;
+TaskHandle_t TaskSensorHandle;
+TaskHandle_t TaskControlHandle;
 TaskHandle_t TaskHandleSerial;
 
 void sensorA() { sensor.handleA(); }
@@ -56,20 +56,27 @@ void sensorC() { sensor.handleC(); }
 
 // state variables
 
+#define UNDEFINED_VALUE -123456
+#define RAIL_LENGTH_DEBUG 2190
+#define SPEED_ALMOST_ZERO 10
+
 uint8_t currentSystemState = STATE_START;
 uint8_t prevState = STATE_START;
 
-float currentSpeed = 0;
-float currentAngle = 0;
+float currentSpeed = UNDEFINED_VALUE;
+float currentAngle = UNDEFINED_VALUE;
 float lastSpeed = 0;
+
+int movementDirection = DIRECTION_UNDEFINED;
+bool currentPeakEventTriggered = false;
+int standbyTimerStart = 0;
+
+// sensor reading variables
 
 float raw_speed[50] = {0};
 float raw_angle[50] = {0};
 
 int sensor_index = 0;
-
-#define UNDEFINED_VALUE -123456
-#define RAIL_LENGTH_DEBUG 2190
 
 // web parameters TODO define defaults in header
 float vmax = 100;                         // rad/s
@@ -104,8 +111,8 @@ void initPins()
   /*pinMode(26, OUTPUT);
   digitalWrite(26, HIGH);*/
 
-  analogReadResolution(10);
-  analogSetAttenuation(ADC_0db);
+ // analogReadResolution(10);
+ // analogSetAttenuation(ADC_0db);
 
   pinMode(HALL_U, INPUT_PULLUP);
   pinMode(HALL_V, INPUT_PULLUP);
@@ -141,8 +148,11 @@ void setup()
 {
   WiFi.mode(WIFI_OFF);
 
+  // set CPU frequency to 80MHz TODO activate
+  // setCpuFrequencyMhz(80);
+
   Serial.begin(LOG_BAUD);
-  //logSerial.begin(LOG_BAUD);
+  // logSerial.begin(LOG_BAUD);
 
   ledInit();
   ledMagenta();
@@ -152,11 +162,11 @@ void setup()
 
   // delay(500);
 
-  initVariables();
+  //initVariables();
 
   initPins();
 
-  delay(50);
+  // delay(50); // TODO rimuovere
 
   // initialize sensor hardware
   logSerial.println("Initializing sensors");
@@ -216,7 +226,7 @@ void setup()
   // velocity low pass filtering
   // default 5ms - try different values to see what is the best.
   // the lower the less filtered
-  motor.LPF_velocity.Tf = 0.001;
+  motor.LPF_velocity.Tf = 0.1;
 
   /*motor.PID_current_q.P = 5;
   motor.PID_current_q.I = 1000;
@@ -227,38 +237,17 @@ void setup()
 
   motor.voltage_limit = 16.8;
   // motor.current_limit = 4.3;
-  motor.velocity_limit = MAX_SPEED; // rad/s
+  // motor.velocity_limit = MAX_SPEED; // rad/s
 
   motor.foc_modulation = FOCModulationType::SinePWM;
   // initialize motor
   motor.init();
 
-  delay(100);
-
-  // print current sense pins
-  // logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
-
-  /*// init current sense TODO disattivato
-  if (current_sense.init())
-    logSerial.println("Current sense init success!");
-  else
-  {
-    logSerial.println("Current sense init failed!");
-    return;
-  }
-
-  // link the motor to current sense
-  motor.linkCurrentSense(&current_sense);*/
-
-  /*current_sense.gain_a = -5.0f;
-  current_sense.gain_b = -5.0f;
-  current_sense.gain_c = -5.0f;*/
-
-  // current_sense.skip_align = true;
+  // delay(100); // TODO remove
 
   logSerial.println("Motor pre FOC OK");
 
-  delay(100);
+  // delay(100); // TODO remove
 
   motor.initFOC(0.0, Direction::CCW);
   logSerial.println("Motor OK");
@@ -268,49 +257,27 @@ void setup()
   motor.disable();
   digitalWrite(ENABLE_PIN, LOW);
 
-  // delay(1000);
-
-  // logSerial.printf("Current sense pins: %d %d %d \n", current_sense.pinA, current_sense.pinB, current_sense.pinC);
-  delay(500);
+  //  delay(500); // TODO remove
 
   currentSystemState = STATE_START;
   endSetupMillis = millis();
-  // motor.target = (300);
-
-  // #ifndef COMMANDER_ENABLED
-  /*xTaskCreatePinnedToCore(
-      TaskPrintData,
-      "TaskLoop",
-      5000,
-      NULL,
-      5,
-      &TaskHandleData,
-      0);
 
   xTaskCreatePinnedToCore(
-      TaskControlSpeed,
-      "TaskSpeed",
-      5000,
-      NULL,
-      5,
-      &TaskHandleSpeed,
-      1);*/
-  xTaskCreatePinnedToCore(
-      Task1,
-      "Task1",
+      TaskControl,
+      "TaskControl",
       5000,
       NULL,
       15,
-      &TaskHandle1,
+      &TaskControlHandle,
       1);
 
   xTaskCreatePinnedToCore(
-      Task0,
-      "Task0",
+      TaskSensor,
+      "TaskSensor",
       5000,
       NULL,
       10,
-      &TaskHandle0,
+      &TaskSensorHandle,
       0);
 
   xTaskCreatePinnedToCore(
@@ -330,14 +297,12 @@ void setup()
       5,
       &TaskHandleSerial,
       0);
-  // #endif
 }
 
-void Task0(void *pvParameters) // task raccolta dati/commander
+void TaskSensor(void *pvParameters) // task raccolta dati/commander
 {
   while (1)
   {
-    // logSerial.println("Task 1");
     // motor.monitor();
     // command.run();
 
@@ -358,6 +323,7 @@ void Task0(void *pvParameters) // task raccolta dati/commander
     delay(1);
   }
 }
+
 /*
 float vmax = 100;                         // rad/s
 float vmax_frenata = 500;                 // rad/s
@@ -376,129 +342,104 @@ float brakeVoltage(float speed)
   return floatMap(speed, vmin_frenata, vmax_frenata, 0, c_frenata) / 10;
 }
 
-bool updateState(int pulses, float speed, int millis)
+// determine from speed the direction of movement
+int determineMovementDirection(int speed)
+{
+  if (speed > SPEED_ALMOST_ZERO)
+  {
+    return DIRECTION_POSITIVE;
+  }
+  else if (speed < -SPEED_ALMOST_ZERO)
+  {
+    return DIRECTION_NEGATIVE;
+  }
+
+  // speed==0
+  return DIRECTION_UNDEFINED;
+}
+
+bool updateState(float speed, int millis, float target)
 {
   switch (currentSystemState)
   {
   case STATE_START:
-    if (millis - endSetupMillis > 2000 && speed == 0)
+  {
+    if (speed != UNDEFINED_VALUE)
     {
-      sensor.electric_rotations = 0;
-      currentSystemState = STATE_INACTIVE;
+      currentSystemState = STATE_INCORSA;
+
+      movementDirection = determineMovementDirection(speed);
 
       // print condition for state update
-      logSerial.printf("STATE_START -> STATE_INACTIVE millis(%d) - endSetupMillis(%d) > 2000 && speed(%.2f) == 0\n", millis, endSetupMillis, speed);
+      logSerial.printf("STATE_START -> STATE_INCORSA speed(%.2f)\n", speed);
     }
     break;
-  case STATE_INACTIVE:
-    if (pulses > pulseStart && speed > vmax)
+  }
+  case STATE_INCORSA:
+  {
+    if (abs(speed) <= SPEED_ALMOST_ZERO || currentPeakEventTriggered) // TODO currentPeakEventTriggered
     {
-      currentSystemState = STATE_SPINTA;
+      currentPeakEventTriggered = false;
+      currentSystemState = STATE_STANDBY;
+      standbyTimerStart = millis;
 
       // print condition for state update
-      logSerial.printf("STATE_INACTIVE -> STATE_SPINTA pulses(%d) > pulseStart(%d) && speed(%.2f) > vmax(%.2f)\n", pulses, pulseStart, speed, vmax);
-    }
-    else if (pulses > pulseEnd && speed < vmin)
-    {
-      currentSystemState = STATE_FINECORSA;
-
-      // print condition for state update
-      logSerial.printf("STATE_INACTIVE -> STATE_FINECORSA pulses(%d) > pulseEnd(%d) && speed(%.2f) < vmin(%.2f)\n", pulses, pulseEnd, speed, vmin);
+      logSerial.printf("STATE_INCORSA -> STATE_STANDBY speed(%.2f) == 0 || currentPeakEventTriggered(%d) == 1\n", speed, currentPeakEventTriggered);
     }
     break;
-  case STATE_SPINTA:
-    if (pulses > pulseStop || speed < vmin)
+  }
+  case STATE_STANDBY:
+  {
+    if (abs(speed) > v_tocco)
     {
-      currentSystemState = STATE_FRENATA;
-
-      // print condition for state update
-      logSerial.printf("STATE_SPINTA -> STATE_FRENATA pulses(%d) > pulseStop(%d) || speed(%.2f) < vmin(%.2f)\n", pulses, pulseStop, speed, vmin);
-    }
-    break;
-  case STATE_FRENATA:
-    if (pulses > pulseEnd)
-    {
-      currentSystemState = STATE_QUASIFINECORSA;
-
-      // print condition for state update
-      logSerial.printf("STATE_FRENATA -> STATE_QUASIFINECORSA pulses(%d) > pulseEnd(%d)\n", pulses, pulseEnd);
-    }
-    break;
-  case STATE_QUASIFINECORSA:
-    if (speed == 0)
-    { // TODO mettere speed "circa" 0?
-      currentSystemState = STATE_FINECORSA;
-
-      // print condition for state update
-      logSerial.printf("STATE_QUASIFINECORSA -> STATE_FINECORSA speed(%.2f) == 0\n", speed);
-    }
-    break;
-  case STATE_FINECORSA:
-    if (millis - timeoutStart > timeoutDuration || speed < -v_tocco)
-    {
-      timeoutStart = 0;
       currentSystemState = STATE_INIZIO_RITORNO;
+      standbyTimerStart = 0;
+
+      movementDirection = determineMovementDirection(speed);
 
       // print condition for state update
-      logSerial.printf("STATE_FINECORSA -> STATE_INIZIO_RITORNO millis(%d) - timeoutStart(%d) > timeoutDuration(%d) || speed(%.2f) < -v_tocco(%.2f)\n", millis, timeoutStart, timeoutDuration, speed, -v_tocco);
+      logSerial.printf("STATE_STANDBY -> STATE_INIZIO_RITORNO abs(speed)(%.2f) > v_tocco \n", abs(speed));
+    }
+    else if (standbyTimerStart!=0 && millis - standbyTimerStart > STANDBY_TIMEOUT)
+    {
+
+      // print condition for state update
+      logSerial.printf("STATE_STANDBY -> SHUTDOWN millis(%d) - standbyTimerStart(%d) > %d\n", millis, standbyTimerStart, STANDBY_TIMEOUT);
+      delay(100);
+
+      digitalWrite(ENABLE_BAT, LOW);
     }
     break;
+  }
+
   case STATE_INIZIO_RITORNO:
-    if (speed < -vmin - 10 /*|| pulses > pulseEnd*/)
+  {
+    if (abs(motor.target) > tbrake && abs(speed) <= SPEED_ALMOST_ZERO) // probable obstacle or blocked by hand, stop and wait for new input or timeout
     {
-      currentSystemState = STATE_RITORNO_VEL;
-
+      currentSystemState = STATE_STANDBY;
       // print condition for state update
-      logSerial.printf("STATE_INIZIO_RITORNO -> STATE_RITORNO_VEL speed(%.2f) < -vmin(%.2f) - 10\n", speed, -vmin);
+      logSerial.printf("STATE_INIZIO_RITORNO -> STATE_STANDBY abs(motor.target)(%.2f) > tbrake(%.2f) && abs(speed)(%.2f) <= SPEED_ALMOST_ZERO\n", abs(motor.target), tbrake, abs(speed));
+    }
+    else if (abs(speed) > 60) // if close to v_return go to STATE_INCORSA to resume normal control
+    {
+      currentSystemState = STATE_INCORSA;
+      // print condition for state update
+      logSerial.printf("STATE_INIZIO_RITORNO -> STATE_INCORSA abs(speed)(%.2f) > 60\n", abs(speed));
     }
     break;
-  case STATE_RITORNO_VEL:
-    if (pulses < pulseStart)
-    {
-      currentSystemState = STATE_RITORNO_TOR;
-
-      // print condition for state update
-      logSerial.printf("STATE_RITORNO_VEL -> STATE_RITORNO_TOR pulses(%d) < pulseStart(%d)\n", pulses, pulseStart);
-    }
-    break;
-  case STATE_RITORNO_TOR:
-    if (speed == 0)
-    {
-      sensor.electric_rotations = 0;
-      currentSystemState = STATE_INACTIVE;
-
-      // print condition for state update
-      logSerial.printf("STATE_RITORNO_TOR -> STATE_INACTIVE speed(%.2f) == 0\n", speed);
-    }
-    break;
+  }
   }
   return true;
 }
 
-void Task1(void *pvParameters) // task implementazione funzionalità
+void TaskControl(void *pvParameters) // task implementazione funzionalità
 {
 
   while (1)
   {
-    delay(50);
 
-    int pulses = radiansToImpulses(currentAngle);
+    // int pulses = radiansToImpulses(currentAngle);
     float targetSpinta = 0;
-
-    // DQVoltage_s voltage = motor.voltage;
-
-    // logSerial.println("Current angle: " + String(currentAngle) + " - Current speed: " + String(currentSpeed) + " - Current pulses: " + String(pulses) + " - Target: " + String(motor.target) + " - Voltage: " + String(voltage.q) + "/" + String(voltage.d));
-
-    /*logSerial.print(currentSpeed);
-    logSerial.print("\t");
-    logSerial.println(motor.target);*/
-
-    /*if (currentSpeed > 3 * vmax)
-    {
-      motor.controller = MotionControlType::velocity;
-      motor.target = 0.0;
-      continue;
-    }*/
 
     if (launchDebug) // usato per simulare lancio di anta su sistema con volano
     {
@@ -528,7 +469,7 @@ void Task1(void *pvParameters) // task implementazione funzionalità
     else
     {
 
-      if (!updateState(pulses, currentSpeed, millis()))
+      if (!updateState(currentSpeed, millis(), motor.target))
       {
         logSerial.println("Error, invalid state");
         motor.disable();
@@ -540,70 +481,51 @@ void Task1(void *pvParameters) // task implementazione funzionalità
       switch (currentSystemState)
       {
       case STATE_START:
-        motor.controller = MotionControlType::torque;
-        if (!motor.enabled)
-        {
-          digitalWrite(ENABLE_PIN, HIGH);
-          motor.enable();
-        }
+      {
+        // do nothing
+        break;
+      }
 
+      case STATE_INCORSA:
+      {
+        // targetSpinta = -movementDirection * brakeVoltage(abs(currentSpeed));
         // motor.controller = MotionControlType::torque;
-        motor.target = 0.45;
-        break;
-      case STATE_INACTIVE:
-        // TODO reset inizio corsa
-        motor.target = 0;
-        if (motor.enabled)
-        {
-          motor.disable();
-          digitalWrite(ENABLE_PIN, LOW);
-        }
-        break;
-      case STATE_SPINTA:
-        targetSpinta = brakeVoltage(currentSpeed);
-        motor.controller = MotionControlType::torque;
         if (!motor.enabled)
         {
           digitalWrite(ENABLE_PIN, HIGH);
           motor.enable();
         }
 
-        if (targetSpinta == 0)
+        /*if (targetSpinta == 0)
         {
           digitalWrite(ENABLE_PIN, LOW);
         }
         else
         {
           digitalWrite(ENABLE_PIN, HIGH);
-        }
+        }*/
+
+        motor.controller = MotionControlType::velocity;
+
+        targetSpinta = -movementDirection * vmin;
 
         motor.target = targetSpinta;
         break;
-      case STATE_FRENATA:
-        digitalWrite(ENABLE_PIN, HIGH);
-        motor.controller = MotionControlType::velocity;
-        motor.target = -vmin;
-        break;
-      case STATE_QUASIFINECORSA:
-        motor.controller = MotionControlType::torque;
-        motor.target = -tend;
-        break;
-      case STATE_FINECORSA:
-        // TODO reset fine corsa
-        motor.target = 0;
+      }
 
+      case STATE_STANDBY:
+      {
+        motor.target = 0;
         if (motor.enabled)
         {
           motor.disable();
           digitalWrite(ENABLE_PIN, LOW);
         }
-
-        if (timeoutStart == 0)
-        {
-          timeoutStart = millis();
-        }
         break;
+      }
+
       case STATE_INIZIO_RITORNO:
+      {
         motor.controller = MotionControlType::torque;
         if (!motor.enabled)
         {
@@ -611,37 +533,22 @@ void Task1(void *pvParameters) // task implementazione funzionalità
           motor.enable();
         }
 
-        motor.target += 0.05;
+        motor.target += movementDirection * 0.25;
 
         break;
-      case STATE_RITORNO_VEL:
-        motor.controller = MotionControlType::velocity;
-        motor.target = vmin + 20;
-        break;
-      case STATE_RITORNO_TOR:
-        motor.controller = MotionControlType::torque;
-        motor.target = tend * 1.2;
-        break;
+      }
       }
     }
 
-    /* data["time"] = millis();
-     // data["angle"] = currentAngle;
-     data["pulses"] = pulses;
-     data["speed"] = currentSpeed;
-     data["voltage"] = 0.0f;
-     data["target"] = motor.target;
-     data["control"] = motor.controller;
-     data["state"] = currentSystemState;*/
-
+    // update variables to be logged
     logTime = millis();
-    logPulses = pulses;
     logSpeed = currentSpeed;
     logVoltage = 0.0f;
     logTarget = motor.target;
     logControl = motor.controller;
     logState = currentSystemState;
-    // serializeJson(data, logSerial); su altro task
+
+    delay(50); // TODO?
   }
 }
 
@@ -866,7 +773,7 @@ void saveCurrentPreferences()
   Serial.println("Preferences saved");
 }
 
-void loop()
+void loop() // loop only for SimpleFOC control
 {
   // main FOC algorithm function
   motor.loopFOC();

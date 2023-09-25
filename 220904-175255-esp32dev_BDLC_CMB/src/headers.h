@@ -56,7 +56,7 @@
 
 // stati per macchina a stati
 
-#define STATE_START 0
+/*#define STATE_START 0
 #define STATE_INACTIVE 1
 #define STATE_SPINTA 2
 #define STATE_FRENATA 3
@@ -64,7 +64,18 @@
 #define STATE_FINECORSA 5
 #define STATE_INIZIO_RITORNO 6
 #define STATE_RITORNO_VEL 7
-#define STATE_RITORNO_TOR 8
+#define STATE_RITORNO_TOR 8*/
+
+#define STATE_START 0
+#define STATE_INCORSA 1
+#define STATE_STANDBY 2
+#define STATE_INIZIO_RITORNO 3
+
+#define DIRECTION_POSITIVE 1
+#define DIRECTION_NEGATIVE -1
+#define DIRECTION_UNDEFINED 0
+
+#define STANDBY_TIMEOUT 30000
 
 // valori default parametri
 #define DEFAULT_VMAX 100
