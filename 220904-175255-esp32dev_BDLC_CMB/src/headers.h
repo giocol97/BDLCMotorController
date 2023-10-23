@@ -28,12 +28,14 @@
 #define PWM_V 14
 #define PWM_W 12
 
-//quando freno è da abbassare TODO
+// quando freno è da abbassare TODO
 #define IN_2 26
 
 // Current sensing
 #define SHUNT_RESISTOR 0.003
 #define CURRENT_SENSING_GAIN 10
+
+#define BUTTON_PIN -1 // TODO
 
 /*#define I_U 32
 #define I_V 25
@@ -65,6 +67,10 @@
 #define STATE_INIZIO_RITORNO 6
 #define STATE_RITORNO_VEL 7
 #define STATE_RITORNO_TOR 8
+#define STATE_CONFIGURAZIONE 9  // new 201023
+#define STATE_RICARICA 10       // new 201023
+#define STATE_FINERICARICA 11   // new 201023
+#define STATE_FINESTART 12 // new 201023
 
 // valori default parametri
 #define DEFAULT_VMAX 100
@@ -77,8 +83,8 @@
 #define DEFAULT_PULSE_START RAIL_LENGTH_DEBUG * 0.1
 #define DEFAULT_PULSE_STOP RAIL_LENGTH_DEBUG * 0.75
 #define DEFAULT_PULSE_END RAIL_LENGTH_DEBUG * 0.9
-#define DEFAULT_TEND 0.3
-#define DEFAULT_TBRAKE 0.7
+#define DEFAULT_TEND 0.7
+#define DEFAULT_TBRAKE 1.3
 #define DEFAULT_TIMEOUT_DURATION 10000
 
 float avgNoZero(float *arr, int size);

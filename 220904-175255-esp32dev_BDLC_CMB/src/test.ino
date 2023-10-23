@@ -86,12 +86,29 @@ float tend = 0.3;                         // V
 float tbrake = 0.7;
 long timeoutDuration = 10000;
 
+int railLength = 0;
+
+float v_configurazione = 10; // rad/s TODO confermare
+
 int state = 0;
 
 long endSetupMillis = 0;
+int endStartStateMillis = 0;
 int timeoutStart = 0;
 bool closing = false;
 bool launchDebug = false;
+
+int countConfigurationLeft = 0;
+int countConfigurationRight = 0;
+int configurationDirection = 1; // 1=right, -1=left
+int pulsesLeft = 0;
+int pulsesRight = 0;
+int timeFromConfigStart = 0;
+
+bool configurationDone = false;
+
+int timeoutRicarica = 0;
+int timeoutFineRicarica = 0;
 
 void initPins()
 {
@@ -120,6 +137,12 @@ void initVariables()
 {
   preferences.begin(CONFIG_NAMESPACE, false);
 
+  railLength = preferences.getInt("railLength", RAIL_LENGTH_DEBUG);
+
+  pulseStart = railLength * 0.1;
+  pulseStop = railLength * 0.75;
+  pulseEnd = railLength * 0.9;
+
   vmax = preferences.getFloat("vmax", DEFAULT_VMAX);
   vmax_frenata = preferences.getFloat("vmax_frenata", DEFAULT_VMAX_FRENATA);
   vmin_frenata = preferences.getFloat("vmin_frenata", DEFAULT_VMIN_FRENATA);
@@ -127,12 +150,15 @@ void initVariables()
   vmin = preferences.getFloat("vmin", DEFAULT_VMIN);
   v_tocco = preferences.getFloat("v_tocco", DEFAULT_VTOCCO);
   rampDuration = preferences.getFloat("rampDuration", DEFAULT_RAMP_DURATION);
-  pulseStart = preferences.getInt("pulseStart", DEFAULT_PULSE_START);
+  /*pulseStart = preferences.getInt("pulseStart", DEFAULT_PULSE_START);
   pulseStop = preferences.getInt("pulseStop", DEFAULT_PULSE_STOP);
-  pulseEnd = preferences.getInt("pulseEnd", DEFAULT_PULSE_END);
+  pulseEnd = preferences.getInt("pulseEnd", DEFAULT_PULSE_END);*/
   tend = preferences.getFloat("tend", DEFAULT_TEND);
   tbrake = preferences.getFloat("tbrake", DEFAULT_TBRAKE);
   timeoutDuration = preferences.getLong("timeoutDuration", DEFAULT_TIMEOUT_DURATION);
+
+  // print all variables
+  logSerial.printf("railLength: %d - vmax: %.2f - vmax_frenata: %.2f - vmin_frenata: %.2f - c_frenata: %.2f - vmin: %.2f - v_tocco: %.2f - rampDuration: %.2f - pulseStart: %d - pulseStop: %d - pulseEnd: %d - tend: %.2f - tbrake: %.2f - timeoutDuration: %d\n", railLength, vmax, vmax_frenata, vmin_frenata, c_frenata, vmin, v_tocco, rampDuration, pulseStart, pulseStop, pulseEnd, tend, tbrake, timeoutDuration);
 
   preferences.end();
 }
@@ -142,7 +168,7 @@ void setup()
   WiFi.mode(WIFI_OFF);
 
   Serial.begin(LOG_BAUD);
-  //logSerial.begin(LOG_BAUD);
+  // logSerial.begin(LOG_BAUD);
 
   ledInit();
   ledMagenta();
@@ -381,17 +407,110 @@ bool updateState(int pulses, float speed, int millis)
   switch (currentSystemState)
   {
   case STATE_START:
-    if (millis - endSetupMillis > 2000 && speed == 0)
+    if (millis - endSetupMillis > 2000)
     {
-      sensor.electric_rotations = 0;
-      currentSystemState = STATE_INACTIVE;
-
-      // print condition for state update
-      logSerial.printf("STATE_START -> STATE_INACTIVE millis(%d) - endSetupMillis(%d) > 2000 && speed(%.2f) == 0\n", millis, endSetupMillis, speed);
+      endStartStateMillis = millis;
+      currentSystemState = STATE_FINESTART;
+      logSerial.printf("STATE_START -> STATE_FINESTART millis(%d) - endSetupMillis(%d) > 2000\n", millis, endSetupMillis);
     }
+
     break;
+  case STATE_FINESTART:
+  {
+    if (millis - endStartStateMillis > 500)
+    {
+      if (speed == 0)
+      {
+        sensor.electric_rotations = 0;
+        currentSystemState = STATE_INACTIVE;
+
+        // print condition for state update
+        logSerial.printf("STATE_START -> STATE_INACTIVE millis(%d) - endSetupMillis(%d) > 2000 && speed(%.2f) == 0\n", millis, endSetupMillis, speed);
+      }
+      else if (speed != 0)
+      {
+        currentSystemState = STATE_RICARICA;
+        logSerial.printf("STATE_START -> STATE_RICARICA speed(%.2f) != 0\n", speed);
+      }
+    }
+  }
+  break;
+  case STATE_RICARICA:
+  {
+    if (speed == 0)
+    {
+      if (timeoutRicarica == 0)
+      {
+        timeoutRicarica == millis;
+      }
+
+      if (millis - timeoutRicarica > 3000)
+      {
+        timeoutFineRicarica = millis;
+        currentSystemState = STATE_FINERICARICA;
+        logSerial.printf("STATE_RICARICA -> STATE_FINERICARICA speed(%.2f) == 0 && millis(%d) - timeoutRicarica(%d) > 3000\n", speed, millis, timeoutRicarica);
+      }
+    }
+    else
+    {
+      timeoutRicarica = 0;
+    }
+  }
+  break;
+  case STATE_FINERICARICA:
+  {
+    if (speed == 0 && millis - timeoutFineRicarica > 1000)
+    {
+      currentSystemState = STATE_INACTIVE;
+      sensor.electric_rotations = 0;
+      logSerial.printf("STATE_FINERICARICA -> STATE_INACTIVE speed(%.2f) == 0\n", speed);
+    }
+  }
+  break;
+  case STATE_CONFIGURAZIONE:
+  {
+    pulsesLeft = min(pulsesLeft, pulses);
+    pulsesRight = max(pulsesRight, pulses);
+
+    if (speed == 0 && millis - timeFromConfigStart > 1000) // TODO filtro su velocità?
+    {
+      if (countConfigurationLeft == 1 && countConfigurationRight == 1) // configurati entrambi i lati, fine configurazione
+      {
+        // save rail length configuration to Preferences
+        preferences.begin(CONFIG_NAMESPACE, false);
+        preferences.putInt("railLength", pulsesRight - pulsesLeft);
+
+        currentSystemState = STATE_INACTIVE;
+
+        logSerial.printf("railLength: %d from pulsesLeft(%d) pulsesRight(%d)\n", pulsesRight - pulsesLeft, pulsesLeft, pulsesRight);
+
+        logSerial.printf("STATE_CONFIGURAZIONE -> STATE_INACTIVE countConfigurationLeft(%d) == 2 && countConfigurationRight(%d) == 2\n", countConfigurationLeft, countConfigurationRight);
+      }
+      else if (configurationDirection == 1)
+      {
+        configurationDirection = -1;
+        countConfigurationRight++;
+        timeFromConfigStart = millis;
+      }
+      else if (configurationDirection == -1)
+      {
+        configurationDirection = 1;
+        countConfigurationLeft++;
+        timeFromConfigStart = millis;
+      }
+    }
+  }
+  break;
   case STATE_INACTIVE:
-    if (pulses > pulseStart && speed > vmax)
+    if (!configurationDone || digitalRead(BUTTON_PIN))
+    {
+      configurationDone = true;
+      timeFromConfigStart = millis;
+      currentSystemState = STATE_CONFIGURAZIONE;
+
+      logSerial.printf("STATE_INACTIVE -> STATE_CONFIGURAZIONE digitalRead(BUTTON_PIN)(%d)\n", digitalRead(BUTTON_PIN));
+    }
+    else if (pulses > pulseStart && speed > vmax)
     {
       currentSystemState = STATE_SPINTA;
 
@@ -550,6 +669,61 @@ void Task1(void *pvParameters) // task implementazione funzionalità
         // motor.controller = MotionControlType::torque;
         motor.target = 0.45;
         break;
+      case STATE_FINESTART:
+      {
+        motor.target = 0;
+        if (motor.enabled)
+        {
+          motor.disable();
+          digitalWrite(ENABLE_PIN, LOW);
+        }
+        break;
+      }
+      break;
+      case STATE_CONFIGURAZIONE:
+      {
+        motor.controller = MotionControlType::torque;
+        if (!motor.enabled)
+        {
+          digitalWrite(ENABLE_PIN, HIGH);
+          motor.enable();
+        }
+
+        if (abs(currentSpeed) < 15)
+        {
+          motor.target = 1 * configurationDirection;
+        }
+
+        if (abs(currentSpeed) > 35)
+        {
+          motor.target = 0;
+        }
+      }
+      break;
+      case STATE_RICARICA:
+      {
+        motor.target = 0;
+        if (motor.enabled)
+        {
+          motor.disable();
+          digitalWrite(ENABLE_PIN, LOW);
+        }
+        break;
+      }
+      break;
+      case STATE_FINERICARICA:
+      {
+        motor.controller = MotionControlType::torque;
+        if (!motor.enabled)
+        {
+          digitalWrite(ENABLE_PIN, HIGH);
+          motor.enable();
+        }
+
+        // motor.controller = MotionControlType::torque;
+        motor.target = 0.75;
+      }
+      break;
       case STATE_INACTIVE:
         // TODO reset inizio corsa
         motor.target = 0;
