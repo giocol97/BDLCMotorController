@@ -105,6 +105,8 @@ int pulsesLeft = 0;
 int pulsesRight = 0;
 int timeFromConfigStart = 0;
 
+int inactivityTimeout = 0;
+
 bool configurationDone = false;
 
 int timeoutRicarica = 0;
@@ -523,6 +525,23 @@ bool updateState(int pulses, float speed, int millis)
 
       // print condition for state update
       logSerial.printf("STATE_INACTIVE -> STATE_FINECORSA pulses(%d) > pulseEnd(%d) && speed(%.2f) < vmin(%.2f)\n", pulses, pulseEnd, speed, vmin);
+    }
+    else if (inactivityTimeout == 0)
+    {
+      inactivityTimeout = millis;
+    }
+    else if (millis - inactivityTimeout > 300 * 1000) // se inattivo per più di 300s passa in light sleep con sveglia da interrupt
+    {
+      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+      esp_sleep_enable_ext1_wakeup(
+          (1ULL << HALL_U) |
+              (1ULL << HALL_V) |
+              (1ULL << HALL_W),
+          ESP_EXT1_WAKEUP_ANY_HIGH);
+
+      esp_light_sleep_start();
+
+      // stato???
     }
     break;
   case STATE_SPINTA:
