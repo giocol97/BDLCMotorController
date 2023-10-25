@@ -532,6 +532,8 @@ bool updateState(int pulses, float speed, int millis)
     }
     else if (millis - inactivityTimeout > 300 * 1000) // se inattivo per più di 300s passa in light sleep con sveglia da interrupt
     {
+      inactivityTimeout = 0;
+
       esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
       esp_sleep_enable_ext1_wakeup(
           (1ULL << HALL_U) |
@@ -541,7 +543,7 @@ bool updateState(int pulses, float speed, int millis)
 
       esp_light_sleep_start();
 
-      // stato???
+      // stato? TODO
     }
     break;
   case STATE_SPINTA:
