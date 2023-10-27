@@ -35,7 +35,7 @@
 #define SHUNT_RESISTOR 0.003
 #define CURRENT_SENSING_GAIN 10
 
-#define BUTTON_PIN -1 // TODO
+#define BUTTON_PIN 16 // TODO
 
 /*#define I_U 32
 #define I_V 25

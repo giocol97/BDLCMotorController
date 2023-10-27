@@ -144,7 +144,7 @@ void initVariables()
 
   pulseStart = railLength * 0.1;
   pulseStop = railLength * 0.75;
-  pulseEnd = railLength * 0.8;
+  pulseEnd = railLength * 0.9;
 
   /*vmax = preferences.getFloat("vmax", DEFAULT_VMAX);
   vmax_frenata = preferences.getFloat("vmax_frenata", DEFAULT_VMAX_FRENATA);
@@ -410,27 +410,17 @@ bool updateState(int pulses, float speed, int millis)
   switch (currentSystemState)
   {
   case STATE_START:
-    if (millis - endSetupMillis > 200)
+    if (millis - endSetupMillis > 2000)
     {
-      if (speed == 0)
-      {
-        endStartStateMillis = millis;
-        currentSystemState = STATE_FINESTART;
-
-        // print condition for state update
-        logSerial.printf("STATE_START -> STATE_FINESTART millis(%d) - endSetupMillis(%d) > 2000\n", millis, endSetupMillis);
-      }
-      else if (speed != 0)
-      {
-        currentSystemState = STATE_RICARICA;
-        logSerial.printf("STATE_START -> STATE_RICARICA speed(%.2f) != 0\n", speed);
-      }     
+      endStartStateMillis = millis;
+      currentSystemState = STATE_FINESTART;
+      logSerial.printf("STATE_START -> STATE_FINESTART millis(%d) - endSetupMillis(%d) > 2000\n", millis, endSetupMillis);
     }
 
     break;
   case STATE_FINESTART:
   {
-    if (millis - endStartStateMillis > 200)
+    if (millis - endStartStateMillis > 2000)
     {
       if (speed == 0)
       {
@@ -439,6 +429,11 @@ bool updateState(int pulses, float speed, int millis)
 
         // print condition for state update
         logSerial.printf("STATE_START -> STATE_INACTIVE millis(%d) - endSetupMillis(%d) > 2000 && speed(%.2f) == 0\n", millis, endSetupMillis, speed);
+      }
+      else if (speed != 0)
+      {
+        currentSystemState = STATE_RICARICA;
+        logSerial.printf("STATE_START -> STATE_RICARICA speed(%.2f) != 0\n", speed);
       }
     }
   }
@@ -694,24 +689,23 @@ void Task1(void *pvParameters) // task implementazione funzionalità
       switch (currentSystemState)
       {
       case STATE_START:
-        //motor.controller = MotionControlType::torque;
-        if (motor.enabled)
+        motor.controller = MotionControlType::torque;
+        if (!motor.enabled)
         {
-          digitalWrite(ENABLE_PIN, LOW);
-          motor.disable();
+          digitalWrite(ENABLE_PIN, HIGH);
+          motor.enable();
         }
 
         // motor.controller = MotionControlType::torque;
-        motor.target = 0;
+        motor.target = 0.6;
         break;
       case STATE_FINESTART:
       {
-        motor.controller = MotionControlType::torque;
-        motor.target = 0.6;
-        if (!motor.enabled)
+        motor.target = 0;
+        if (motor.enabled)
         {
-          motor.enable();
-          digitalWrite(ENABLE_PIN, HIGH);
+          motor.disable();
+          digitalWrite(ENABLE_PIN, LOW);
         }
         break;
       }
@@ -798,35 +792,16 @@ void Task1(void *pvParameters) // task implementazione funzionalità
           digitalWrite(ENABLE_PIN, HIGH);
         }
 
-        motor.target = targetSpinta;         //modificato, inizialmente era targetspinta, ma in questo momento slitta. Da verificare
+        motor.target = targetSpinta;
         break;
       case STATE_FRENATA:
         digitalWrite(ENABLE_PIN, HIGH);
-        //motor.controller = MotionControlType::velocity;
-        motor.controller = MotionControlType::torque;
-        if (abs(currentSpeed) < vmin)
-        {
-          motor.target = -0.8;
-        }
-
-        if (abs(currentSpeed) > vmin)
-        {
-          motor.target = -0.3;
-        }
-        //motor.target = -vmin;
+        motor.controller = MotionControlType::velocity;
+        motor.target = -vmin;
         break;
       case STATE_QUASIFINECORSA:
         motor.controller = MotionControlType::torque;
-        if (abs(currentSpeed) < 20)
-        {
-          motor.target = -0.5;
-        }
-
-        if (abs(currentSpeed) > 25)
-        {
-          motor.target = -0.3;
-        }
-        //motor.target = -tend;
+        motor.target = -tend;
         break;
       case STATE_FINECORSA:
         // TODO reset fine corsa
@@ -855,31 +830,12 @@ void Task1(void *pvParameters) // task implementazione funzionalità
 
         break;
       case STATE_RITORNO_VEL:
-        //motor.controller = MotionControlType::velocity;
-        //motor.target = vmin;
-        motor.controller = MotionControlType::torque;
-        if (abs(currentSpeed) < vmin)
-        {
-          motor.target = 1;
-        }
-
-        if (abs(currentSpeed) > vmin)
-        {
-          motor.target = 0.6;
-        }
+        motor.controller = MotionControlType::velocity;
+        motor.target = vmin;
         break;
       case STATE_RITORNO_TOR:
         motor.controller = MotionControlType::torque;
-        if (abs(currentSpeed) < 20)
-        {
-          motor.target = 1;
-        }
-
-        if (abs(currentSpeed) > 25)
-        {
-          motor.target = 0.6;
-        }
-        //motor.target = tend * 1.2;
+        motor.target = tend * 1.2;
         break;
       }
     }
